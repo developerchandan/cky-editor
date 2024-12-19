@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # **CKY-Editor**
 
 CKY-Editor is a lightweight, flexible, and feature-rich **Rich Text Editor** built specifically for **Angular 16** applications. Designed with simplicity and flexibility in mind, CKY-Editor provides developers with a seamless, easy-to-integrate solution for adding rich text editing functionality to their projects. Whether you’re building a CMS, blog, or any other application requiring text formatting, CKY-Editor offers a robust and reliable toolset to meet your needs.
@@ -104,3 +105,6 @@ Inspired by modern content editing tools.
 Special thanks to the Angular community for their guidance.
 
 ```bash
+=======
+# cky-editor
+>>>>>>> 9b9943b4d79b7d3d6d55e7414b7c60813958b2ce
