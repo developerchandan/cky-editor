@@ -58,8 +58,8 @@ import { CKYEditorModule } from 'cky-editor';
   ],
   bootstrap: [AppComponent]
 })
-```
 export class AppModule {}
+```
 
 # Step 2: Add the CKY-Editor Component
 Use the CKY-Editor in your HTML file:
@@ -97,7 +97,7 @@ This project is licensed under the MIT License. See the LICENSE file for details
 For support or questions, feel free to:
 
 Open an issue in the GitHub Issues section.
-Email us at chandan.ydv498@gmail.com.com.
+Email us at chandan.ydv498@gmail.com.
 
 # Acknowledgments
 Inspired by modern content editing tools.
