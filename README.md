@@ -44,7 +44,7 @@ To install CKY-Editor, use npm:
 
 # Step 1: Import CKY-Editor Module
 Import CKYEditorModule into your Angular application:
-
+```bash
 // app.module.ts
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
@@ -58,15 +58,17 @@ import { CKYEditorModule } from 'cky-editor';
   ],
   bootstrap: [AppComponent]
 })
+```
 export class AppModule {}
 
 # Step 2: Add the CKY-Editor Component
 Use the CKY-Editor in your HTML file:
+```bash
 <cky-editor [(ngModel)]="content"></cky-editor>
-
-
+```
 # Step 3: Bind the Editor to a Variable
 Bind the editor to a variable in your component:
+```bash
 // app.component.ts
 import { Component } from '@angular/core';
 
@@ -78,15 +80,15 @@ import { Component } from '@angular/core';
 export class AppComponent {
   content: string = ''; // Bind this to the editor
 }
-
+```
 # Authors
-Chandan Kumar & Anand Prakash : Project Lead & Primary Developer.
+Chandan Kumar : Project Lead & Primary Developer.
 
 # Contributors
 
 Thanks to the following people for contributing to this project:
 
-Anand Prakash
+Anand Prakash, Sohrab ALI
 
 # License
 This project is licensed under the MIT License. See the LICENSE file for details.
@@ -101,4 +103,4 @@ Email us at chandan.ydv498@gmail.com.com.
 Inspired by modern content editing tools.
 Special thanks to the Angular community for their guidance.
 
-```bash
+
