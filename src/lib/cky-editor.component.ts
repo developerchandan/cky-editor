@@ -3,6 +3,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'lib-cky-editor',
+  standalone: false,
   template: `
    <!-- rich-editor.component.html -->
 <div class="rich-editor-container">
@@ -18,7 +19,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
         <option value="h6">Heading 6</option>
         <option value="pre">Code</option>
       </select>
-      <select formControlName="fontFamily" (change)="changeFontFamily($event)">
+      <select [value]="fontFamily" (change)="changeFontFamily($event)">
         <option value="Arial, sans-serif">Sans Serif</option>
         <option value="Times New Roman, serif">Serif</option>
         <option value="Courier New, monospace">Monospace</option>
@@ -98,6 +99,37 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
       <button (click)="toggleSourceView()" title="Source Code">
         <i class="fas fa-code"></i>
       </button>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- New Features: Undo/Redo -->
+      <button (click)="undo()" title="Undo (Ctrl+Z)" [disabled]="!canUndo">
+        <i class="fas fa-undo"></i>
+      </button>
+      <button (click)="redo()" title="Redo (Ctrl+Y)" [disabled]="!canRedo">
+        <i class="fas fa-redo"></i>
+      </button>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- New Features: Export & Print -->
+      <button (click)="exportToWord()" title="Export to Word">
+        <i class="fas fa-file-word"></i>
+      </button>
+      <button (click)="exportToPDF()" title="Export to PDF">
+        <i class="fas fa-file-pdf"></i>
+      </button>
+      <button (click)="printContent()" title="Print">
+        <i class="fas fa-print"></i>
+      </button>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- Word/Character Count -->
+      <div class="word-count-display">
+        <span class="count-text">Words: {{ wordCount }}</span>
+        <span class="count-text">Chars: {{ characterCount }}</span>
+      </div>
     </div>
   
     <!-- Hidden file inputs -->
@@ -174,6 +206,39 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
   
   .toolbar i {
     font-size: 14px;
+  }
+
+  .toolbar-separator {
+    width: 1px;
+    height: 20px;
+    background: #ccc;
+    margin: 0 4px;
+  }
+
+  .word-count-display {
+    display: flex;
+    gap: 12px;
+    margin-left: 8px;
+    padding: 4px 8px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .count-text {
+    white-space: nowrap;
+  }
+
+  .toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .toolbar button:disabled:hover {
+    background: #fff;
+    border-color: #ccc;
   }
   
   .color-picker {
@@ -344,13 +409,25 @@ export class CkyEditorComponent {
   onChange: any = () => {};
   onTouch: any = () => {};
 
+  // New Features: Undo/Redo
+  private history: string[] = [];
+  private historyIndex: number = -1;
+  private maxHistorySize: number = 50;
+  canUndo: boolean = false;
+  canRedo: boolean = false;
+
+  // Word/Character Count
+  wordCount: number = 0;
+  characterCount: number = 0;
+
   constructor(private renderer: Renderer2) {}
 
-  ngOnInit() {
-    debugger
+  ngOnInit(): void {
     this.setupAdvancedPasteHandler();
     this.setupSelectionSaver();
     this.setupTableContextMenu();
+    this.setupUndoRedo();
+    this.updateCounts();
   }
 
   ngAfterViewInit() {
@@ -374,9 +451,94 @@ export class CkyEditorComponent {
     this.renderer.setStyle(this.editableContent.nativeElement, 'min-height', '200px');
   }
 
+  // Setup Undo/Redo functionality
+  private setupUndoRedo(): void {
+    if (this.editableContent) {
+      // Save initial state
+      this.saveToHistory();
+
+      // Listen for keyboard shortcuts
+      this.editableContent.nativeElement.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Ctrl+Z for undo
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          this.undo();
+        }
+        // Ctrl+Y or Ctrl+Shift+Z for redo
+        if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+          e.preventDefault();
+          this.redo();
+        }
+      });
+
+      // Save to history on input (with debounce)
+      let timeout: any;
+      this.editableContent.nativeElement.addEventListener('input', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          this.saveToHistory();
+        }, 300);
+      });
+    }
+  }
+
+  private saveToHistory(): void {
+    if (!this.editableContent) return;
+    
+    const currentContent = this.editableContent.nativeElement.innerHTML;
+    
+    // Don't save if content hasn't changed
+    if (this.history[this.historyIndex] === currentContent) {
+      return;
+    }
+
+    // Remove future history if we're in the middle
+    if (this.historyIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.historyIndex + 1);
+    }
+
+    // Add to history
+    this.history.push(currentContent);
+    this.historyIndex++;
+
+    // Limit history size
+    if (this.history.length > this.maxHistorySize) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+
+    this.updateUndoRedoState();
+  }
+
+  undo(): void {
+    if (!this.canUndo || !this.editableContent) return;
+
+    this.historyIndex--;
+    this.content = this.history[this.historyIndex];
+    this.editableContent.nativeElement.innerHTML = this.content;
+    this.onChange(this.content);
+    this.updateUndoRedoState();
+    this.updateCounts();
+  }
+
+  redo(): void {
+    if (!this.canRedo || !this.editableContent) return;
+
+    this.historyIndex++;
+    this.content = this.history[this.historyIndex];
+    this.editableContent.nativeElement.innerHTML = this.content;
+    this.onChange(this.content);
+    this.updateUndoRedoState();
+    this.updateCounts();
+  }
+
+  private updateUndoRedoState(): void {
+    this.canUndo = this.historyIndex > 0;
+    this.canRedo = this.historyIndex < this.history.length - 1;
+  }
+
   // Advanced Paste Handler
-  private setupAdvancedPasteHandler() {
-    debugger
+  private setupAdvancedPasteHandler(): void {
     if (this.editableContent) {
       this.editableContent.nativeElement.addEventListener('paste', (e: ClipboardEvent) => {
         e.preventDefault();
@@ -519,6 +681,11 @@ export class CkyEditorComponent {
     this.content = value || '';
     if (this.editableContent) {
       this.editableContent.nativeElement.innerHTML = this.content;
+      // Reset history when value is set from outside
+      this.history = [this.content];
+      this.historyIndex = 0;
+      this.updateUndoRedoState();
+      this.updateCounts();
     }
   }
 
@@ -570,7 +737,20 @@ export class CkyEditorComponent {
       if (selection && selection.rangeCount > 0) {
         this.selection = selection.getRangeAt(0).cloneRange();
       }
+
+      // Update word and character counts
+      this.updateCounts();
     }
+  }
+
+  // Update word and character counts
+  private updateCounts(): void {
+    if (!this.editableContent) return;
+
+    const text = this.editableContent.nativeElement.innerText || '';
+    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+    this.wordCount = text.trim() === '' ? 0 : words.length;
+    this.characterCount = text.length;
   }
   // Other existing methods
   onKeyDown(event: KeyboardEvent): void {
@@ -813,8 +993,128 @@ changeFontFamily(event: Event): void {
     } else {
       const content = this.editableContent.nativeElement.textContent || '';
       this.editableContent.nativeElement.innerHTML = content;
+      this.onContentChange();
     }
   }
 
+  // Export to Word Document
+  exportToWord(): void {
+    if (!this.content) {
+      alert('No content to export!');
+      return;
+    }
 
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Document</title>
+        </head>
+        <body>
+          ${this.content}
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff', htmlContent], {
+      type: 'application/msword'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'document.doc';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  // Export to PDF (using browser print to PDF)
+  exportToPDF(): void {
+    if (!this.content) {
+      alert('No content to export!');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to export PDF');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Export PDF</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 20px;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            @media print {
+              body { margin: 0; padding: 15px; }
+            }
+          </style>
+        </head>
+        <body>
+          ${this.content}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
+
+  // Print content
+  printContent(): void {
+    if (!this.content) {
+      alert('No content to print!');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Print Document</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 20px;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            @media print {
+              body { margin: 0; padding: 15px; }
+              @page { margin: 1cm; }
+            }
+          </style>
+        </head>
+        <body>
+          ${this.content}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
 }
