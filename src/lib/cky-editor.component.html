@@ -160,6 +160,18 @@
             </div>
           }
         </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-select" title="Font family" [class.is-open]="openMenu === 'fontFamily'" (click)="toggleMenu('fontFamily')">
+            <span class="cky-select-label">{{ state.font }}</span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'fontFamily') {
+            <div class="cky-menu">
+              @for (f of fontFamilies; track f.label) {
+                <button type="button" class="cky-menu-item" [class.is-on]="state.font === f.label" [style.font-family]="f.value" (click)="setFontFamily(f.value)">{{ f.label }}</button>
+              }
+            </div>
+          }
+        </div>
         <span class="cky-sep"></span>
 
         <button type="button" class="cky-btn" title="Bold (Ctrl+B)" [class.is-on]="state.bold" (click)="exec('bold')" [innerHTML]="icon.bold"></button>

@@ -151,13 +151,16 @@ lib-cky-editor {
 
 .cky-select {
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 8px 0 10px;
+  gap: 4px;
+  padding: 0 4px 0 8px;
 }
 
 .cky-select-label {
-  min-width: 90px;
+  min-width: 64px;
+  max-width: 108px;
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

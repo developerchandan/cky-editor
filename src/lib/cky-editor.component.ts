@@ -20,6 +20,7 @@ import {
   BULLET_STYLES,
   COLORS,
   EMOJIS,
+  FONT_FAMILIES,
   FONT_SIZES,
   HEADINGS,
   LAYOUTS,
@@ -50,7 +51,7 @@ type Mode = 'wysiwyg' | 'source' | 'preview';
 type DialogKind = 'link' | 'find' | 'imageUrl' | 'media' | 'bookmark';
 type MenuId =
   | 'textCase' | 'image' | 'table' | 'emoji' | 'special' | 'heading' | 'style' | 'fontSize'
-  | 'fontColor' | 'highlight' | 'align' | 'lineHeight' | 'layout' | 'template' | 'bullet' | 'number';
+  | 'fontFamily' | 'fontColor' | 'highlight' | 'align' | 'lineHeight' | 'layout' | 'template' | 'bullet' | 'number';
 
 interface PainterFormat {
   bold: boolean;
@@ -60,6 +61,7 @@ interface PainterFormat {
   color: string;
   background: string | null;
   fontSize: string;
+  fontFamily: string;
 }
 
 const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,blockquote,pre,li';
@@ -94,6 +96,7 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
 
   readonly headings = HEADINGS;
   readonly styles = STYLES;
+  readonly fontFamilies = FONT_FAMILIES;
   readonly fontSizes = FONT_SIZES;
   readonly lineHeights = LINE_HEIGHTS;
   readonly colors = COLORS;
@@ -121,6 +124,7 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
   state = {
     bold: false, italic: false, underline: false, strike: false, superscript: false, subscript: false,
     ul: false, ol: false, blockquote: false, link: false, inTable: false, block: 'p', align: 'left',
+    font: 'Default',
   };
   painter: PainterFormat | null = null;
   fullscreen = false;
@@ -360,7 +364,13 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
 
   setFontSize(size: string): void {
     this.restoreSelection();
-    this.applyFontSize(size);
+    this.applyInlineStyle('fontSize', size);
+    this.afterEdit();
+  }
+
+  setFontFamily(family: string): void {
+    this.restoreSelection();
+    this.applyInlineStyle('fontFamily', family);
     this.afterEdit();
   }
 
@@ -723,6 +733,7 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
       color: getComputedStyle(el).color,
       background: (el.closest('[style*="background"]') as HTMLElement | null)?.style.backgroundColor || null,
       fontSize: (el.closest('span[style*="font-size"]') as HTMLElement | null)?.style.fontSize ?? '',
+      fontFamily: (el.closest('span[style*="font-family"]') as HTMLElement | null)?.style.fontFamily ?? '',
     };
     this.flash('Select text to apply the copied formatting');
   }
@@ -742,7 +753,8 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
     document.execCommand('foreColor', false, format.color);
     if (format.background) document.execCommand('hiliteColor', false, format.background);
     document.execCommand('styleWithCSS', false, 'false');
-    if (format.fontSize) this.applyFontSize(format.fontSize);
+    if (format.fontSize) this.applyInlineStyle('fontSize', format.fontSize);
+    if (format.fontFamily) this.applyInlineStyle('fontFamily', format.fontFamily);
     this.afterEdit();
   }
 
@@ -850,6 +862,7 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
       inTable: !!closestCell(this.selectionNode(), this.editor),
       block: block && this.editor.contains(block) ? block.tagName.toLowerCase() : 'p',
       align: el ? getComputedStyle(el).textAlign.replace('start', 'left') : 'left',
+      font: this.fontLabel(el),
     };
     this.cdr.markForCheck();
   }
@@ -930,15 +943,27 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
     this.selectRange(selected);
   }
 
-  private applyFontSize(size: string): void {
-    document.execCommand('fontSize', false, '7');
-    this.editor.querySelectorAll('font[size="7"]').forEach((font) => {
-      if (!size) return font.replaceWith(...Array.from(font.childNodes));
+  // execCommand only emits legacy <font> tags; mark them, then swap for styled spans.
+  private applyInlineStyle(property: 'fontSize' | 'fontFamily', value: string): void {
+    const [command, marker, selector] =
+      property === 'fontSize'
+        ? ['fontSize', '7', 'font[size="7"]']
+        : ['fontName', 'cky-font', 'font[face="cky-font"]'];
+    document.execCommand(command, false, marker);
+    this.editor.querySelectorAll(selector).forEach((font) => {
+      font.querySelectorAll<HTMLElement>('[style]').forEach((el) => (el.style[property] = ''));
+      if (!value) return font.replaceWith(...Array.from(font.childNodes));
       const span = document.createElement('span');
-      span.style.fontSize = size;
+      span.style[property] = value;
       span.append(...Array.from(font.childNodes));
       font.replaceWith(span);
     });
+  }
+
+  private fontLabel(el: HTMLElement | null): string {
+    const primary = (stack: string) => stack.split(',')[0].replace(/["']/g, '').trim().toLowerCase();
+    const current = el ? primary(getComputedStyle(el).fontFamily) : '';
+    return this.fontFamilies.find((f) => f.value && primary(f.value) === current)?.label ?? 'Default';
   }
 
   private flash(message: string): void {

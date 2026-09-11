@@ -9,7 +9,7 @@ A professional, dependency-free rich text editor for **Angular 21**. Crisp SVG t
 | **History** | Undo / redo (100 steps) with `Ctrl+Z` / `Ctrl+Y` |
 | **Document** | HTML source view, preview mode, import (`.html`, `.txt`, `.doc`), export to Word, export to PDF, print |
 | **Tools** | Format painter, change case (UPPER / lower / Title), find & replace with match highlighting, select all, spell-check toggle |
-| **Text** | Headings H1–H6, text & block styles, bold, italic, underline, strikethrough, superscript, subscript, font size, font color, highlight, remove format |
+| **Text** | Headings H1–H6, text & block styles, bold, italic, underline, strikethrough, superscript, subscript, font family (Arial, Georgia, Times New Roman, Verdana, Trebuchet MS, Courier New, Tahoma), font size, font color, highlight, remove format |
 | **Paragraph** | Alignment, line height, indent / outdent, block quote, code block |
 | **Lists** | Bulleted (disc / circle / square), numbered (1, 01, a, A, i, I), multi-level (1.1, 1.2), to-do checklists |
 | **Tables** | Grid picker up to 10×10, insert row above/below, insert column left/right, header row toggle, delete row/column/table, `Tab` to move between cells |
@@ -129,7 +129,7 @@ Then open `http://localhost:4200`.
 ### v3.0.0
 - Redesigned toolbar with a professional SVG icon set — the Font Awesome dependency is gone
 - Tables: add/remove rows and columns, header row toggle, Tab navigation
-- New: find & replace, format painter, change case, superscript/subscript, bookmarks, file attachments, media embeds, code blocks, page breaks, emoji, special characters, layouts, templates, line height, bullet/number styles, multi-level and to-do lists, full-screen, preview, import
+- New: find & replace, format painter, change case, superscript/subscript, bookmarks, file attachments, media embeds, code blocks, page breaks, emoji, special characters, layouts, templates, font family, line height, bullet/number styles, multi-level and to-do lists, full-screen, preview, import
 - Clean paste from Word / Google Docs and HTML sanitization on paste, import and source edits
 - Standalone component (still exported through `CkyEditorModule`)
 - **Breaking:** removed the empty `CkyEditorService`; Font Awesome is no longer a peer dependency

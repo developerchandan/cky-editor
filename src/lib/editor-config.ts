@@ -28,6 +28,17 @@ export const STYLES: StyleOption[] = [
   { label: 'Side quote', value: 'cky-side-quote', kind: 'block' },
 ];
 
+export const FONT_FAMILIES: Option[] = [
+  { label: 'Default', value: '' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Times New Roman', value: "'Times New Roman', Times, serif" },
+  { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Trebuchet MS', value: "'Trebuchet MS', Helvetica, sans-serif" },
+  { label: 'Courier New', value: "'Courier New', Courier, monospace" },
+  { label: 'Tahoma', value: 'Tahoma, Geneva, sans-serif' },
+];
+
 export const FONT_SIZES: Option[] = [
   { label: 'Tiny', value: '10px' },
   { label: 'Small', value: '13px' },
