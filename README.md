@@ -241,6 +241,12 @@ Report bugs and request features through [GitHub Issues](https://github.com/deve
 
 ## Changelog
 
+### 3.0.1
+
+- Headings, lists, bold and links keep their styling in apps that use a CSS reset (such as Tailwind preflight)
+- Choosing a font family or size with no text selected now applies it to the text you type next
+- The published package contains only the build output, README and license
+
 ### 3.0.0
 
 - Redesigned two-row toolbar with an SVG icon set; Font Awesome is no longer required

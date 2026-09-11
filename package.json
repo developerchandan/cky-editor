@@ -1,6 +1,6 @@
 {
   "name": "cky-editor",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Rich text editor for Angular 21 with editable tables, media embeds, find and replace, and Word/PDF export.",
   "keywords": [
     "angular",
@@ -48,6 +48,10 @@
     "ng-packagr": "^21.0.0",
     "typescript": "~5.9.2"
   },
+  "files": [
+    "fesm2022",
+    "types"
+  ],
   "publishConfig": {
     "access": "public"
   },
