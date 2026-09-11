@@ -1,0 +1,31 @@
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+  <h1 style="text-align: center; color: #333; margin-bottom: 30px;">{{ title() }} - CKY Editor v2.0.0</h1>
+  
+  <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <h2 style="margin-top: 0;">✨ Rich Text Editor with New Features</h2>
+    <p style="color: #666; margin-bottom: 20px;">Try the new features: Undo/Redo, Export to Word/PDF, Print, and Word Counter!</p>
+    
+    <lib-cky-editor [(ngModel)]="editorContent"></lib-cky-editor>
+  </div>
+  
+  <div style="margin-top: 30px; background: #f5f5f5; padding: 20px; border-radius: 8px;">
+    <h3>📄 Editor Output (HTML):</h3>
+    <pre style="background: white; padding: 15px; border-radius: 4px; overflow-x: auto; max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{{ editorContent }}</pre>
+  </div>
+  
+  <div style="margin-top: 20px; background: #f5f5f5; padding: 20px; border-radius: 8px;">
+    <h3>👀 Preview:</h3>
+    <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ddd; min-height: 100px;" [innerHTML]="editorContent"></div>
+  </div>
+
+  <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px;">
+    <h4>🎉 New Features in v2.0.0:</h4>
+    <ul style="line-height: 1.8;">
+      <li><strong>Undo/Redo:</strong> Use Ctrl+Z / Ctrl+Y or toolbar buttons</li>
+      <li><strong>Export to Word:</strong> Click the Word icon to download .doc file</li>
+      <li><strong>Export to PDF:</strong> Click the PDF icon to print/save as PDF</li>
+      <li><strong>Print:</strong> Click the print icon to print your content</li>
+      <li><strong>Word Counter:</strong> See real-time word and character count</li>
+    </ul>
+  </div>
+</div>

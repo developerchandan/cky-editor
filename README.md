@@ -1,10 +1,11 @@
-# **CKY-Editor v2.0.0** 🚀
+# **CKY-Editor v2.1.0** 🚀
 
 CKY-Editor is a lightweight, flexible, and feature-rich **Rich Text Editor** built specifically for **Angular 21** applications. Designed with simplicity and flexibility in mind, CKY-Editor provides developers with a seamless, easy-to-integrate solution for adding rich text editing functionality to their projects. Whether you're building a CMS, blog, or any other application requiring text formatting, CKY-Editor offers a robust and reliable toolset to meet your needs.
 
-## 🎉 **What's New in v2.0.0**
+## 🎉 **What's New in v2.1.0**
 
 ### ✨ New Features
+- 🔲 **Insert Table** - Interactive row/column grid picker to insert tables directly into content
 - 🔄 **Undo/Redo Functionality** - Full history management with keyboard shortcuts (Ctrl+Z, Ctrl+Y)
 - 📄 **Export to Word** - Export your content as a .doc file
 - 📑 **Export to PDF** - Convert and download your content as PDF
@@ -90,6 +91,18 @@ Don't forget to install Font Awesome for icons:
 ```bash
 npm install @fortawesome/fontawesome-free
 ```
+
+## **Demo**
+
+A runnable example app lives in [`demo/`](./demo). To try it locally:
+
+```bash
+cd demo
+npm install
+npm start
+```
+
+Then open `http://localhost:4200`.
 
 ## **Usage**
 
@@ -212,7 +225,11 @@ export class MyComponent {
 
 ## **Changelog**
 
-### v2.0.0 (Latest)
+### v2.1.0 (Latest)
+- ✨ Added Insert Table feature with interactive row/column grid picker
+- 📁 Added a runnable `demo/` Angular app showcasing the editor
+
+### v2.0.0
 - ✨ Added Undo/Redo functionality
 - ✨ Added Export to Word feature
 - ✨ Added Export to PDF feature
