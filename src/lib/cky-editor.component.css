@@ -540,9 +540,22 @@ cky-editor {
 
 .cky-content > :first-child { margin-top: 0; }
 .cky-content p { margin: 0 0 0.75em; }
+/* Explicit values so host-app CSS resets (Tailwind preflight, normalize) cannot flatten content. */
 .cky-content h1, .cky-content h2, .cky-content h3,
 .cky-content h4, .cky-content h5, .cky-content h6 { margin: 1em 0 0.5em; line-height: 1.25; }
-.cky-content a { color: var(--cky-accent, #2563eb); }
+.cky-content h1 { font-size: 2em; font-weight: 700; }
+.cky-content h2 { font-size: 1.5em; font-weight: 700; }
+.cky-content h3 { font-size: 1.25em; font-weight: 600; }
+.cky-content h4 { font-size: 1.1em; font-weight: 600; }
+.cky-content h5 { font-size: 1em; font-weight: 600; }
+.cky-content h6 { font-size: 0.875em; font-weight: 600; }
+.cky-content strong, .cky-content b { font-weight: 700; }
+.cky-content em, .cky-content i { font-style: italic; }
+.cky-content ul, .cky-content ol { margin: 0 0 0.75em; padding-left: 1.6em; }
+.cky-content ul { list-style: disc; }
+.cky-content ol { list-style: decimal; }
+.cky-content ul ul { list-style: circle; }
+.cky-content a { color: var(--cky-accent, #2563eb); text-decoration: underline; }
 .cky-content img { max-width: 100%; height: auto; }
 .cky-content hr { border: 0; border-top: 2px solid #e5e7eb; margin: 1.25em 0; }
 

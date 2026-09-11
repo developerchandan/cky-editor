@@ -945,6 +945,11 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
 
   // execCommand only emits legacy <font> tags; mark them, then swap for styled spans.
   private applyInlineStyle(property: 'fontSize' | 'fontFamily', value: string): void {
+    const selection = document.getSelection();
+    if (selection?.rangeCount && selection.isCollapsed) {
+      this.insertStyledCaret(selection.getRangeAt(0), property, value);
+      return;
+    }
     const [command, marker, selector] =
       property === 'fontSize'
         ? ['fontSize', '7', 'font[size="7"]']
@@ -958,6 +963,19 @@ export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, 
       span.append(...Array.from(font.childNodes));
       font.replaceWith(span);
     });
+  }
+
+  // With no selection, execCommand would leave its marker font behind for the next typed text.
+  // Instead, park the caret in a styled span (held open by a zero-width space) so typing inherits it.
+  private insertStyledCaret(range: Range, property: 'fontSize' | 'fontFamily', value: string): void {
+    const span = document.createElement('span');
+    span.style[property] = value || getComputedStyle(this.editor)[property];
+    span.textContent = '\u200b';
+    range.insertNode(span);
+    const caret = document.createRange();
+    caret.setStart(span.firstChild!, 1);
+    caret.collapse(true);
+    this.selectRange(caret);
   }
 
   private fontLabel(el: HTMLElement | null): string {
