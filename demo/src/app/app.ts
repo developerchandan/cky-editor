@@ -1,14 +1,17 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CkyEditorModule } from './cky-editor/cky-editor.module';
+import { CkyEditorComponent } from 'cky-editor';
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule, CkyEditorModule],
+  imports: [FormsModule, CkyEditorComponent],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrl: './app.css',
 })
 export class App {
-  protected readonly title = signal('CKY Editor Demo');
-  editorContent: string = '<p>Welcome to <strong>CKY Editor v2.0.0</strong>! 🎉</p><p>Try the new features:</p><ul><li>Undo/Redo (Ctrl+Z, Ctrl+Y)</li><li>Export to Word/PDF</li><li>Print functionality</li><li>Word & Character counter</li></ul>';
+  content =
+    '<h2>Welcome to CKY Editor 3</h2>' +
+    '<p>A professional rich text editor for <strong>Angular 21</strong>. Try the toolbar above — ' +
+    'insert a <em>table</em>, add rows and columns, embed a YouTube video, or press <strong>Ctrl+F</strong> to find &amp; replace.</p>' +
+    '<ul class="cky-todo"><li class="cky-checked">Upgrade to Angular 21</li><li>Ship v3 to npm</li></ul>';
 }

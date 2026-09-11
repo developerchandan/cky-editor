@@ -1,286 +1,151 @@
-# **CKY-Editor v2.1.0** 🚀
+# CKY Editor
 
-CKY-Editor is a lightweight, flexible, and feature-rich **Rich Text Editor** built specifically for **Angular 21** applications. Designed with simplicity and flexibility in mind, CKY-Editor provides developers with a seamless, easy-to-integrate solution for adding rich text editing functionality to their projects. Whether you're building a CMS, blog, or any other application requiring text formatting, CKY-Editor offers a robust and reliable toolset to meet your needs.
+A professional, dependency-free rich text editor for **Angular 21**. Crisp SVG toolbar, tables you can actually edit, media embeds, find & replace, Word/PDF export — and it plugs straight into `ngModel` and reactive forms.
 
-## 🎉 **What's New in v2.1.0**
+## Features
 
-### ✨ New Features
-- 🔲 **Insert Table** - Interactive row/column grid picker to insert tables directly into content
-- 🔄 **Undo/Redo Functionality** - Full history management with keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-- 📄 **Export to Word** - Export your content as a .doc file
-- 📑 **Export to PDF** - Convert and download your content as PDF
-- 🖨️ **Print Support** - Print your content directly from the editor
-- 📊 **Word & Character Count** - Real-time word and character counting
-- 🎨 **Enhanced UI** - Improved toolbar with better organization
-- ⚡ **Better Performance** - Optimized for Angular 21 with improved rendering
+| Area | What you get |
+|------|--------------|
+| **History** | Undo / redo (100 steps) with `Ctrl+Z` / `Ctrl+Y` |
+| **Document** | HTML source view, preview mode, import (`.html`, `.txt`, `.doc`), export to Word, export to PDF, print |
+| **Tools** | Format painter, change case (UPPER / lower / Title), find & replace with match highlighting, select all, spell-check toggle |
+| **Text** | Headings H1–H6, text & block styles, bold, italic, underline, strikethrough, superscript, subscript, font size, font color, highlight, remove format |
+| **Paragraph** | Alignment, line height, indent / outdent, block quote, code block |
+| **Lists** | Bulleted (disc / circle / square), numbered (1, 01, a, A, i, I), multi-level (1.1, 1.2), to-do checklists |
+| **Tables** | Grid picker up to 10×10, insert row above/below, insert column left/right, header row toggle, delete row/column/table, `Tab` to move between cells |
+| **Insert** | Links, bookmarks, images (upload, paste or URL), file attachments, YouTube / Vimeo / MP4 media, page break, horizontal line, emoji, special characters, column layouts, ready-made templates |
+| **View** | Full-screen mode, live word & character count |
 
-### 🔧 Technical Updates
-- ✅ Upgraded from Angular 16 to Angular 21
-- ✅ Enhanced TypeScript support
-- ✅ Improved component architecture
-- ✅ Better error handling
-- ✅ Optimized bundle size
+Pasted content from Word or Google Docs is cleaned automatically, and all imported / pasted / source-edited HTML is sanitized (scripts, event handlers and untrusted iframes are stripped).
 
-## **Features**
-
-### 🌟 **Rich Formatting Options**
-- Support for **bold**, **italic**, **underline**, **strikethrough**, and more
-- Text alignment (left, center, right, justify)
-- Create ordered and unordered lists
-- Hyperlink insertion for easy navigation
-- Media embedding for images, videos, and rich content
-- Font family and size selection
-- Text and background color pickers
-
-### 🆕 **Advanced Features (v2.0.0)**
-- **Undo/Redo** - Full command history with 50-state undo/redo
-- **Export Options** - Export to Word (.doc) and PDF formats
-- **Print Functionality** - Print your content with formatting
-- **Word/Character Counter** - Real-time count display
-- **Source Code View** - Toggle between WYSIWYG and HTML view
-
-### ⚙️ **Customizable Toolbar**
-- Modify the toolbar to include or exclude tools based on your application's requirements
-- Responsive design that adapts to different screen sizes
-- Keyboard shortcuts support
-
-### ⚡ **Angular 21 Compatible**
-- Fully optimized for Angular 21's latest architecture
-- Uses modern Angular features and best practices
-- Ivy rendering engine optimized
-
-### 🖼️ **Media Embedding**
-- Add and manage images easily
-- Support for multiple image formats
-- Image upload and paste support
-- Table creation and editing with context menu
-
-### 📱 **Responsive Design**
-- Works flawlessly on mobile, tablet, and desktop devices
-- Touch-friendly interface
-- Adaptive toolbar layout
-
-### 🧩 **Plug-and-Play**
-- Install, configure, and start using CKY-Editor with minimal effort
-- Simple integration with Angular forms
-- Full support for ngModel and reactive forms
-
-### 🌐 **Cross-Browser Compatibility**
-- Tested and compatible with modern browsers like Chrome, Firefox, Edge, and Safari
-- Consistent behavior across all platforms
-
-## **Why Use CKY-Editor?**
-
-- ✨ Simplifies content creation for end-users with an intuitive interface
-- ⏱️ Saves development time with pre-built, ready-to-use editing features
-- 🔌 Provides an extensible API for custom use cases and advanced requirements
-- 🚀 Lightweight and performant for smooth production-grade performance
-- 📦 Zero external dependencies (except Font Awesome for icons)
-- 🎯 Built specifically for Angular 21 with modern best practices
-
-## **Installation**
-
-To install CKY-Editor, use npm:
+## Installation
 
 ```bash
 npm install cky-editor
 ```
 
-Don't forget to install Font Awesome for icons:
+No icon fonts or other runtime dependencies are needed.
 
-```bash
-npm install @fortawesome/fontawesome-free
-```
+## Usage
 
-## **Demo**
-
-A runnable example app lives in [`demo/`](./demo). To try it locally:
-
-```bash
-cd demo
-npm install
-npm start
-```
-
-Then open `http://localhost:4200`.
-
-## **Usage**
-
-### Step 1: Import CKY-Editor Module
-
-Import `CKYEditorModule` into your Angular application:
+### Standalone components (recommended)
 
 ```typescript
-// app.module.ts
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CKYEditorModule } from 'cky-editor';
+import { CkyEditorComponent } from 'cky-editor';
+
+@Component({
+  selector: 'app-root',
+  imports: [FormsModule, CkyEditorComponent],
+  template: `<lib-cky-editor [(ngModel)]="content" />`,
+})
+export class AppComponent {
+  content = '<p>Hello CKY Editor!</p>';
+}
+```
+
+### NgModule apps
+
+```typescript
+import { CkyEditorModule } from 'cky-editor';
 
 @NgModule({
-  declarations: [AppComponent],
-  imports: [
-    BrowserModule,
-    FormsModule,
-    CKYEditorModule // Import the module here
-  ],
-  bootstrap: [AppComponent]
+  imports: [BrowserModule, FormsModule, CkyEditorModule],
 })
 export class AppModule {}
 ```
 
-### Step 2: Add Font Awesome CSS
-
-Add Font Awesome styles to your `index.html`:
+### Reactive forms
 
 ```html
-<link rel="stylesheet" href="node_modules/@fortawesome/fontawesome-free/css/all.min.css">
-```
-
-Or import in your `styles.css`:
-
-```css
-@import '@fortawesome/fontawesome-free/css/all.min.css';
-```
-
-### Step 3: Add the CKY-Editor Component
-
-Use the CKY-Editor in your HTML file:
-
-```html
-<lib-cky-editor [(ngModel)]="content"></lib-cky-editor>
-```
-
-### Step 4: Bind the Editor to a Variable
-
-Bind the editor to a variable in your component:
-
-```typescript
-// app.component.ts
-import { Component } from '@angular/core';
-
-@Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
-})
-export class AppComponent {
-  content: string = '<p>Welcome to CKY Editor!</p>'; // Bind this to the editor
-}
-```
-
-## **Keyboard Shortcuts**
-
-- `Ctrl + Z` - Undo last action
-- `Ctrl + Y` or `Ctrl + Shift + Z` - Redo last action
-- `Ctrl + B` - Bold text
-- `Ctrl + I` - Italic text
-- `Ctrl + U` - Underline text
-- `Tab` - Insert indentation
-
-## **API Reference**
-
-### Component Selector
-```html
-<lib-cky-editor [(ngModel)]="content"></lib-cky-editor>
-```
-
-### Input Properties
-- `[(ngModel)]` - Two-way binding for editor content (string)
-
-### Methods (Access via ViewChild)
-- `undo()` - Undo last action
-- `redo()` - Redo last action
-- `exportToWord()` - Export content to Word document
-- `exportToPDF()` - Export content to PDF
-- `printContent()` - Print the content
-
-## **Examples**
-
-### Basic Usage
-```html
-<lib-cky-editor [(ngModel)]="myContent"></lib-cky-editor>
-```
-
-### With Reactive Forms
-```typescript
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-
-export class MyComponent {
-  myForm: FormGroup;
-
-  constructor(private fb: FormBuilder) {
-    this.myForm = this.fb.group({
-      content: ['']
-    });
-  }
-}
-```
-
-```html
-<form [formGroup]="myForm">
-  <lib-cky-editor formControlName="content"></lib-cky-editor>
+<form [formGroup]="form">
+  <lib-cky-editor formControlName="content" placeholder="Write your job description…" />
 </form>
 ```
 
-## **Changelog**
+`form.get('content').disable()` puts the editor into a read-only state.
 
-### v2.1.0 (Latest)
-- ✨ Added Insert Table feature with interactive row/column grid picker
-- 📁 Added a runnable `demo/` Angular app showcasing the editor
+## API
+
+### Inputs
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `placeholder` | `string` | `'Type or paste your content here…'` | Shown while the editor is empty |
+| `minHeight` | `number` | `260` | Minimum height of the editing area in px |
+| `documentTitle` | `string` | `'document'` | File name / title used for Word export, PDF and print |
+
+### Public methods (via `@ViewChild`)
+
+`undo()`, `redo()`, `exportToWord()`, `exportToPDF()`, `printContent()`, `toggleFullscreen()`, `insertHtml(html)`, `insertText(text)`
+
+### Theming
+
+The editor reads CSS custom properties, so you can match your brand:
+
+```css
+lib-cky-editor .cky-editor {
+  --cky-accent: #00bfa6;
+  --cky-accent-soft: #e0f7f4;
+  --cky-border: #ced4da;
+  --cky-radius: 8px;
+}
+```
+
+### Rendering saved content
+
+Tables, to-do lists, layouts and styles use `cky-*` classes. Wrap rendered output in `class="cky-content"` so it looks the same as in the editor:
+
+```html
+<article class="cky-content" [innerHTML]="content"></article>
+```
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/⌘ + Z` | Undo |
+| `Ctrl/⌘ + Y`, `Ctrl/⌘ + Shift + Z` | Redo |
+| `Ctrl/⌘ + B / I / U` | Bold / italic / underline |
+| `Ctrl/⌘ + K` | Insert or edit link |
+| `Ctrl/⌘ + F` | Find & replace |
+| `Tab` / `Shift + Tab` | Next / previous table cell, or indent / outdent a list |
+| `Esc` | Exit full screen |
+
+## Demo
+
+A runnable example lives in [`demo/`](./demo). It consumes the built package exactly like an npm user would:
+
+```bash
+npm install && npm run build
+cd demo && npm install && npm start
+```
+
+Then open `http://localhost:4200`.
+
+## Changelog
+
+### v3.0.0
+- Redesigned toolbar with a professional SVG icon set — the Font Awesome dependency is gone
+- Tables: add/remove rows and columns, header row toggle, Tab navigation
+- New: find & replace, format painter, change case, superscript/subscript, bookmarks, file attachments, media embeds, code blocks, page breaks, emoji, special characters, layouts, templates, line height, bullet/number styles, multi-level and to-do lists, full-screen, preview, import
+- Clean paste from Word / Google Docs and HTML sanitization on paste, import and source edits
+- Standalone component (still exported through `CkyEditorModule`)
+- **Breaking:** removed the empty `CkyEditorService`; Font Awesome is no longer a peer dependency
 
 ### v2.0.0
-- ✨ Added Undo/Redo functionality
-- ✨ Added Export to Word feature
-- ✨ Added Export to PDF feature
-- ✨ Added Print functionality
-- ✨ Added Word/Character counter
-- 🔧 Upgraded to Angular 21
-- 🐛 Fixed various bugs
-- 📚 Updated documentation
+- Undo/redo, export to Word and PDF, print, word counter
+- Upgraded to Angular 21
 
 ### v1.0.0
-- 🎉 Initial release
-- Basic rich text editing features
-- Angular 16 support
+- Initial release (Angular 16)
 
-## **Authors**
+## Support
 
-**Chandan Kumar** - Project Lead & Primary Developer
+- Open an issue on [GitHub](https://github.com/developerchandan/cky-editor/issues)
+- Email: chandan.ydv498@gmail.com
 
-## **Contributors**
+## License
 
-Thanks to the following people for contributing to this project:
-- Anand Prakash
-- Sohrab ALI
-
-## **License**
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## **Support**
-
-For support or questions, feel free to:
-
-- 📝 Open an issue in the [GitHub Issues](https://github.com/developerchandan/cky-editor/issues) section
-- 📧 Email us at chandan.ydv498@gmail.com
-
-## **Contributing**
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## **Acknowledgments**
-
-- Inspired by modern content editing tools
-- Special thanks to the Angular community for their guidance
-- Built with ❤️ using Angular 21
-
----
-
-**CKY-Editor** - Powerful Rich Text Editor for Angular 21 🚀
+MIT © Chandan Kumar

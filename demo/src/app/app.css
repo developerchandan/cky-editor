@@ -1,0 +1,47 @@
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.page-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+}
+
+.page-header p {
+  margin: 0 0 20px;
+  color: #6b7280;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e4e6e9;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  color: #6b7280;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.panel pre {
+  max-height: 320px;
+  margin: 0;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
