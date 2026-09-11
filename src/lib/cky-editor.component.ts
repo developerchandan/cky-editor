@@ -69,7 +69,7 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const HISTORY_LIMIT = 100;
 
 @Component({
-  selector: 'lib-cky-editor',
+  selector: 'cky-editor',
   standalone: true,
   templateUrl: './cky-editor.component.html',
   styleUrl: './cky-editor.component.css',

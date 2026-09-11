@@ -83,7 +83,7 @@ import { CkyEditorComponent } from 'cky-editor';
 @Component({
   selector: 'app-article-form',
   imports: [FormsModule, CkyEditorComponent],
-  template: `<lib-cky-editor [(ngModel)]="content" />`,
+  template: `<cky-editor [(ngModel)]="content" />`,
 })
 export class ArticleFormComponent {
   content = '<p>Hello, world.</p>';
@@ -113,7 +113,7 @@ form = new FormGroup({
 
 ```html
 <form [formGroup]="form">
-  <lib-cky-editor formControlName="description" placeholder="Describe the role" />
+  <cky-editor formControlName="description" placeholder="Describe the role" />
 </form>
 ```
 
@@ -123,7 +123,7 @@ Disabling the form control (`form.controls.description.disable()`) makes the edi
 
 ### Selector
 
-`lib-cky-editor`
+`cky-editor`
 
 ### Inputs
 
@@ -156,7 +156,7 @@ Available through `@ViewChild(CkyEditorComponent)`.
 The editor is styled through CSS custom properties. Override them on the editor element:
 
 ```css
-lib-cky-editor .cky-editor {
+cky-editor .cky-editor {
   --cky-accent: #00bfa6;
   --cky-accent-soft: #e0f7f4;
   --cky-border: #ced4da;
@@ -252,6 +252,7 @@ Report bugs and request features through [GitHub Issues](https://github.com/deve
 
 **Breaking changes**
 
+- The component selector is now `<cky-editor>` (previously `<lib-cky-editor>`)
 - Removed `CkyEditorService`
 - Removed the `@fortawesome/fontawesome-free` peer dependency
 - Added `@angular/platform-browser` as a peer dependency
