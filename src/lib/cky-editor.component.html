@@ -1,0 +1,428 @@
+<div class="cky-editor" [class.is-fullscreen]="fullscreen" [class.is-disabled]="disabled">
+  <div class="cky-toolbar" role="toolbar" aria-label="Editor toolbar" (mousedown)="keepSelection($event)">
+    <!-- Row 1: history, document, tools, inserts -->
+    <div class="cky-toolbar-row">
+      <fieldset class="cky-group" [disabled]="!editable">
+        <button type="button" class="cky-btn" title="Undo (Ctrl+Z)" [disabled]="!canUndo" (click)="undo()" [innerHTML]="icon.undo"></button>
+        <button type="button" class="cky-btn" title="Redo (Ctrl+Y)" [disabled]="!canRedo" (click)="redo()" [innerHTML]="icon.redo"></button>
+      </fieldset>
+      <span class="cky-sep"></span>
+
+      <fieldset class="cky-group" [disabled]="disabled">
+        <button type="button" class="cky-btn" title="Source code" [class.is-on]="mode === 'source'" (click)="setMode('source')" [innerHTML]="icon.source"></button>
+        <button type="button" class="cky-btn" title="Preview" [class.is-on]="mode === 'preview'" (click)="setMode('preview')" [innerHTML]="icon.preview"></button>
+      </fieldset>
+      <span class="cky-sep"></span>
+
+      <fieldset class="cky-group" [disabled]="!editable">
+        <button type="button" class="cky-btn" title="Import document (.html, .txt, .doc)" (click)="importInput.click()" [innerHTML]="icon.importWord"></button>
+        <input #importInput type="file" hidden accept=".html,.htm,.txt,.doc" (change)="onImportFile(importInput)" />
+        <button type="button" class="cky-btn" title="Export to Word" (click)="exportToWord()" [innerHTML]="icon.exportWord"></button>
+        <button type="button" class="cky-btn" title="Export to PDF" (click)="exportToPDF()" [innerHTML]="icon.exportPdf"></button>
+        <button type="button" class="cky-btn" title="Print" (click)="printContent()" [innerHTML]="icon.print"></button>
+        <span class="cky-sep"></span>
+
+        <button type="button" class="cky-btn" title="Format painter" [class.is-on]="!!painter" (click)="togglePainter()" [innerHTML]="icon.formatPainter"></button>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Change case" [class.is-open]="openMenu === 'textCase'" (click)="toggleMenu('textCase')">
+            <span [innerHTML]="icon.textCase"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'textCase') {
+            <div class="cky-menu">
+              <button type="button" class="cky-menu-item" (click)="setTextCase('upper')">UPPERCASE</button>
+              <button type="button" class="cky-menu-item" (click)="setTextCase('lower')">lowercase</button>
+              <button type="button" class="cky-menu-item" (click)="setTextCase('title')">Title Case</button>
+            </div>
+          }
+        </div>
+        <button type="button" class="cky-btn" title="Find and replace (Ctrl+F)" [class.is-on]="dialog === 'find'" (click)="openDialog('find')" [innerHTML]="icon.find"></button>
+        <button type="button" class="cky-btn" title="Select all" (click)="selectAll()" [innerHTML]="icon.selectAll"></button>
+        <button type="button" class="cky-btn" title="Spell check" [class.is-on]="spellcheck" (click)="spellcheck = !spellcheck" [innerHTML]="icon.spellcheck"></button>
+        <span class="cky-sep"></span>
+
+        <button type="button" class="cky-btn" title="Link (Ctrl+K)" [class.is-on]="state.link" (click)="openDialog('link')" [innerHTML]="icon.link"></button>
+        <button type="button" class="cky-btn" title="Superscript" [class.is-on]="state.superscript" (click)="exec('superscript')" [innerHTML]="icon.superscript"></button>
+        <button type="button" class="cky-btn" title="Subscript" [class.is-on]="state.subscript" (click)="exec('subscript')" [innerHTML]="icon.subscript"></button>
+        <button type="button" class="cky-btn" title="Bookmark" (click)="openDialog('bookmark')" [innerHTML]="icon.bookmark"></button>
+
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Image" [class.is-open]="openMenu === 'image'" (click)="toggleMenu('image')">
+            <span [innerHTML]="icon.image"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'image') {
+            <div class="cky-menu">
+              <button type="button" class="cky-menu-item" (click)="imageInput.click()">Upload from computer</button>
+              <button type="button" class="cky-menu-item" (click)="openDialog('imageUrl')">Insert via URL</button>
+            </div>
+          }
+          <input #imageInput type="file" hidden accept="image/*" (change)="onImageFile(imageInput)" />
+        </div>
+        <button type="button" class="cky-btn" title="Attach file" (click)="fileInput.click()" [innerHTML]="icon.file"></button>
+        <input #fileInput type="file" hidden (change)="onAttachFile(fileInput)" />
+
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Table" [class.is-on]="state.inTable" [class.is-open]="openMenu === 'table'" (click)="toggleMenu('table')">
+            <span [innerHTML]="icon.table"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'table') {
+            <div class="cky-menu cky-menu-table">
+              <div class="cky-table-grid" (mouseleave)="tableHover = { rows: 0, cols: 0 }">
+                @for (r of gridIndexes; track r) {
+                  @for (c of gridIndexes; track c) {
+                    <span
+                      class="cky-grid-cell"
+                      [class.is-active]="r < tableHover.rows && c < tableHover.cols"
+                      (mouseenter)="tableHover = { rows: r + 1, cols: c + 1 }"
+                      (click)="insertTable(r + 1, c + 1)"
+                    ></span>
+                  }
+                }
+              </div>
+              <div class="cky-grid-label">{{ tableHover.rows ? tableHover.rows + ' × ' + tableHover.cols : 'Insert table' }}</div>
+              @if (state.inTable) {
+                <div class="cky-menu-divider"></div>
+                <button type="button" class="cky-menu-item" (click)="tableAction('rowAbove')">Insert row above</button>
+                <button type="button" class="cky-menu-item" (click)="tableAction('rowBelow')">Insert row below</button>
+                <button type="button" class="cky-menu-item" (click)="tableAction('colLeft')">Insert column left</button>
+                <button type="button" class="cky-menu-item" (click)="tableAction('colRight')">Insert column right</button>
+                <button type="button" class="cky-menu-item" (click)="tableAction('toggleHeader')">Toggle header row</button>
+                <div class="cky-menu-divider"></div>
+                <button type="button" class="cky-menu-item" (click)="tableAction('deleteRow')">Delete row</button>
+                <button type="button" class="cky-menu-item" (click)="tableAction('deleteCol')">Delete column</button>
+                <button type="button" class="cky-menu-item is-danger" (click)="tableAction('deleteTable')">Delete table</button>
+              }
+            </div>
+          }
+        </div>
+
+        <button type="button" class="cky-btn" title="Block quote" [class.is-on]="state.blockquote" (click)="toggleBlockquote()" [innerHTML]="icon.blockquote"></button>
+        <button type="button" class="cky-btn" title="Insert media" (click)="openDialog('media')" [innerHTML]="icon.media"></button>
+        <button type="button" class="cky-btn" title="Code block" (click)="insertCodeBlock()" [innerHTML]="icon.codeBlock"></button>
+        <button type="button" class="cky-btn" title="Page break" (click)="insertPageBreak()" [innerHTML]="icon.pageBreak"></button>
+        <button type="button" class="cky-btn" title="Horizontal line" (click)="exec('insertHorizontalRule')" [innerHTML]="icon.horizontalLine"></button>
+
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn" title="Emoji" [class.is-open]="openMenu === 'emoji'" (click)="toggleMenu('emoji')" [innerHTML]="icon.emoji"></button>
+          @if (openMenu === 'emoji') {
+            <div class="cky-menu cky-menu-grid cky-menu-end">
+              @for (e of emojis; track e) {
+                <button type="button" class="cky-grid-btn" (click)="insertText(e)">{{ e }}</button>
+              }
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn" title="Special characters" [class.is-open]="openMenu === 'special'" (click)="toggleMenu('special')" [innerHTML]="icon.specialChar"></button>
+          @if (openMenu === 'special') {
+            <div class="cky-menu cky-menu-grid cky-menu-end">
+              @for (ch of specialChars; track ch) {
+                <button type="button" class="cky-grid-btn" [title]="ch" (click)="insertText(ch)">{{ ch }}</button>
+              }
+            </div>
+          }
+        </div>
+      </fieldset>
+    </div>
+
+    <!-- Row 2: text formatting, paragraph, lists -->
+    <div class="cky-toolbar-row">
+      <fieldset class="cky-group" [disabled]="!editable">
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-select" title="Heading" [class.is-open]="openMenu === 'heading'" (click)="toggleMenu('heading')">
+            <span class="cky-select-label">{{ headingLabel }}</span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'heading') {
+            <div class="cky-menu cky-menu-headings">
+              @for (h of headings; track h.value) {
+                <button type="button" class="cky-menu-item cky-heading-{{ h.value }}" [class.is-on]="state.block === h.value" (click)="setHeading(h.value)">{{ h.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-select" title="Styles" [class.is-open]="openMenu === 'style'" (click)="toggleMenu('style')">
+            <span class="cky-select-label">Styles</span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'style') {
+            <div class="cky-menu cky-menu-styles">
+              <div class="cky-menu-title">Text styles</div>
+              @for (s of styles; track s.value) {
+                @if (s.kind === 'inline') {
+                  <button type="button" class="cky-menu-item" (click)="applyStyle(s)"><span [class]="s.value">{{ s.label }}</span></button>
+                }
+              }
+              <div class="cky-menu-title">Block styles</div>
+              @for (s of styles; track s.value) {
+                @if (s.kind === 'block') {
+                  <button type="button" class="cky-menu-item" (click)="applyStyle(s)">{{ s.label }}</button>
+                }
+              }
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-select" title="Font family" [class.is-open]="openMenu === 'fontFamily'" (click)="toggleMenu('fontFamily')">
+            <span class="cky-select-label">{{ state.font }}</span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'fontFamily') {
+            <div class="cky-menu">
+              @for (f of fontFamilies; track f.label) {
+                <button type="button" class="cky-menu-item" [class.is-on]="state.font === f.label" [style.font-family]="f.value" (click)="setFontFamily(f.value)">{{ f.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <span class="cky-sep"></span>
+
+        <button type="button" class="cky-btn" title="Bold (Ctrl+B)" [class.is-on]="state.bold" (click)="exec('bold')" [innerHTML]="icon.bold"></button>
+        <button type="button" class="cky-btn" title="Italic (Ctrl+I)" [class.is-on]="state.italic" (click)="exec('italic')" [innerHTML]="icon.italic"></button>
+        <button type="button" class="cky-btn" title="Underline (Ctrl+U)" [class.is-on]="state.underline" (click)="exec('underline')" [innerHTML]="icon.underline"></button>
+        <button type="button" class="cky-btn" title="Strikethrough" [class.is-on]="state.strike" (click)="exec('strikeThrough')" [innerHTML]="icon.strike"></button>
+
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Font size" [class.is-open]="openMenu === 'fontSize'" (click)="toggleMenu('fontSize')">
+            <span [innerHTML]="icon.fontSize"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'fontSize') {
+            <div class="cky-menu">
+              @for (size of fontSizes; track size.label) {
+                <button type="button" class="cky-menu-item" [style.font-size]="size.value" (click)="setFontSize(size.value)">{{ size.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Font color" [class.is-open]="openMenu === 'fontColor'" (click)="toggleMenu('fontColor')">
+            <span [innerHTML]="icon.fontColor"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'fontColor') {
+            <div class="cky-menu cky-menu-colors">
+              @for (color of colors; track color) {
+                <button type="button" class="cky-swatch" [title]="color" [style.background]="color" (click)="setColor('fore', color)"></button>
+              }
+              <label class="cky-custom-color">Custom color <input #foreInput type="color" (change)="setColor('fore', foreInput.value)" /></label>
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Highlight" [class.is-open]="openMenu === 'highlight'" (click)="toggleMenu('highlight')">
+            <span [innerHTML]="icon.highlight"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'highlight') {
+            <div class="cky-menu cky-menu-colors">
+              @for (color of colors; track color) {
+                <button type="button" class="cky-swatch" [title]="color" [style.background]="color" (click)="setColor('back', color)"></button>
+              }
+              <button type="button" class="cky-menu-item cky-span-all" (click)="setColor('back', 'transparent')">Remove highlight</button>
+            </div>
+          }
+        </div>
+        <button type="button" class="cky-btn" title="Remove format" (click)="removeFormat()" [innerHTML]="icon.removeFormat"></button>
+        <span class="cky-sep"></span>
+
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Text alignment" [class.is-open]="openMenu === 'align'" (click)="toggleMenu('align')">
+            <span
+              [innerHTML]="state.align === 'center' ? icon.alignCenter : state.align === 'right' ? icon.alignRight : state.align === 'justify' ? icon.alignJustify : icon.alignLeft"
+            ></span>
+            <span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'align') {
+            <div class="cky-menu cky-menu-row">
+              <button type="button" class="cky-btn" title="Align left" [class.is-on]="state.align === 'left'" (click)="setAlign('left')" [innerHTML]="icon.alignLeft"></button>
+              <button type="button" class="cky-btn" title="Align center" [class.is-on]="state.align === 'center'" (click)="setAlign('center')" [innerHTML]="icon.alignCenter"></button>
+              <button type="button" class="cky-btn" title="Align right" [class.is-on]="state.align === 'right'" (click)="setAlign('right')" [innerHTML]="icon.alignRight"></button>
+              <button type="button" class="cky-btn" title="Justify" [class.is-on]="state.align === 'justify'" (click)="setAlign('justify')" [innerHTML]="icon.alignJustify"></button>
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Line height" [class.is-open]="openMenu === 'lineHeight'" (click)="toggleMenu('lineHeight')">
+            <span [innerHTML]="icon.lineHeight"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'lineHeight') {
+            <div class="cky-menu">
+              @for (lh of lineHeights; track lh.label) {
+                <button type="button" class="cky-menu-item" (click)="setLineHeight(lh.value)">{{ lh.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <span class="cky-sep"></span>
+
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn cky-btn-arrow" title="Layout" [class.is-open]="openMenu === 'layout'" (click)="toggleMenu('layout')">
+            <span [innerHTML]="icon.layout"></span><span class="cky-caret" [innerHTML]="icon.chevron"></span>
+          </button>
+          @if (openMenu === 'layout') {
+            <div class="cky-menu">
+              @for (layout of layouts; track layout.value) {
+                <button type="button" class="cky-menu-item" (click)="insertLayout(layout.value)">{{ layout.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown">
+          <button type="button" class="cky-btn" title="Insert template" [class.is-open]="openMenu === 'template'" (click)="toggleMenu('template')" [innerHTML]="icon.template"></button>
+          @if (openMenu === 'template') {
+            <div class="cky-menu">
+              @for (t of templates; track t.label) {
+                <button type="button" class="cky-menu-item" (click)="insertHtml(t.value)">{{ t.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <span class="cky-sep"></span>
+
+        <div class="cky-dropdown cky-split">
+          <button type="button" class="cky-btn" title="Bulleted list" [class.is-on]="state.ul" (click)="toggleList('ul')" [innerHTML]="icon.bulletList"></button>
+          <button type="button" class="cky-btn cky-arrow" title="Bullet style" [class.is-open]="openMenu === 'bullet'" (click)="toggleMenu('bullet')" [innerHTML]="icon.chevron"></button>
+          @if (openMenu === 'bullet') {
+            <div class="cky-menu">
+              @for (b of bulletStyles; track b.value) {
+                <button type="button" class="cky-menu-item" (click)="setListStyle('ul', b.value)">{{ b.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <div class="cky-dropdown cky-split">
+          <button type="button" class="cky-btn" title="Numbered list" [class.is-on]="state.ol" (click)="toggleList('ol')" [innerHTML]="icon.numberedList"></button>
+          <button type="button" class="cky-btn cky-arrow" title="Numbering style" [class.is-open]="openMenu === 'number'" (click)="toggleMenu('number')" [innerHTML]="icon.chevron"></button>
+          @if (openMenu === 'number') {
+            <div class="cky-menu">
+              @for (n of numberStyles; track n.value) {
+                <button type="button" class="cky-menu-item" (click)="setListStyle('ol', n.value)">{{ n.label }}</button>
+              }
+            </div>
+          }
+        </div>
+        <button type="button" class="cky-btn" title="Multi-level list (1.1, 1.2)" (click)="setListStyle('ol', '', 'cky-multilevel')" [innerHTML]="icon.multiLevelList"></button>
+        <button type="button" class="cky-btn" title="To-do list" (click)="toggleTodoList()" [innerHTML]="icon.todoList"></button>
+        <span class="cky-sep"></span>
+
+        <button type="button" class="cky-btn" title="Decrease indent (Shift+Tab)" (click)="exec('outdent')" [innerHTML]="icon.outdent"></button>
+        <button type="button" class="cky-btn" title="Increase indent (Tab)" (click)="exec('indent')" [innerHTML]="icon.indent"></button>
+      </fieldset>
+
+      <button
+        type="button"
+        class="cky-btn cky-push-end"
+        [title]="fullscreen ? 'Exit full screen (Esc)' : 'Full screen'"
+        [class.is-on]="fullscreen"
+        (click)="toggleFullscreen()"
+        [innerHTML]="fullscreen ? icon.exitFullscreen : icon.fullscreen"
+      ></button>
+    </div>
+  </div>
+
+  @if (dialog && editable) {
+    <div class="cky-panel" (keydown.escape)="closeDialog()">
+      @switch (dialog) {
+        @case ('link') {
+          <label class="cky-field"><span>URL</span>
+            <input class="cky-input" placeholder="https://example.com" [value]="form.linkUrl" (input)="form.linkUrl = inputValue($event)" (keydown.enter)="applyLink()" />
+          </label>
+          <label class="cky-field"><span>Text</span>
+            <input class="cky-input" placeholder="Link text" [value]="form.linkText" (input)="form.linkText = inputValue($event)" (keydown.enter)="applyLink()" />
+          </label>
+          <label class="cky-check"><input type="checkbox" [checked]="form.linkNewTab" (change)="form.linkNewTab = checked($event)" /> Open in new tab</label>
+          <div class="cky-panel-actions">
+            @if (state.link) {
+              <button type="button" class="cky-action" (click)="unlink(); closeDialog()">Remove link</button>
+            }
+            <button type="button" class="cky-action" (click)="closeDialog()">Cancel</button>
+            <button type="button" class="cky-action is-primary" (click)="applyLink()">Save</button>
+          </div>
+        }
+        @case ('find') {
+          <label class="cky-field"><span>Find</span>
+            <input class="cky-input" [value]="form.find" (input)="onFindInput($event)" (keydown.enter)="findNext()" />
+          </label>
+          <label class="cky-field"><span>Replace</span>
+            <input class="cky-input" [value]="form.replace" (input)="form.replace = inputValue($event)" (keydown.enter)="replaceOne()" />
+          </label>
+          <label class="cky-check"><input type="checkbox" [checked]="form.matchCase" (change)="form.matchCase = checked($event); onFindInput($event)" /> Match case</label>
+          <div class="cky-panel-actions">
+            <span class="cky-panel-status">{{ findStatus }}</span>
+            <button type="button" class="cky-action" (click)="findNext()">Find next</button>
+            <button type="button" class="cky-action" (click)="replaceOne()">Replace</button>
+            <button type="button" class="cky-action is-primary" (click)="replaceAll()">Replace all</button>
+            <button type="button" class="cky-btn" title="Close" (click)="closeDialog()" [innerHTML]="icon.close"></button>
+          </div>
+        }
+        @case ('imageUrl') {
+          <label class="cky-field"><span>Image URL</span>
+            <input class="cky-input" placeholder="https://…/photo.jpg" [value]="form.imageUrl" (input)="form.imageUrl = inputValue($event)" (keydown.enter)="applyImageUrl()" />
+          </label>
+          <label class="cky-field"><span>Alt text</span>
+            <input class="cky-input" placeholder="Describe the image" [value]="form.imageAlt" (input)="form.imageAlt = inputValue($event)" (keydown.enter)="applyImageUrl()" />
+          </label>
+          <div class="cky-panel-actions">
+            <button type="button" class="cky-action" (click)="closeDialog()">Cancel</button>
+            <button type="button" class="cky-action is-primary" (click)="applyImageUrl()">Insert</button>
+          </div>
+        }
+        @case ('media') {
+          <label class="cky-field cky-field-wide"><span>Media URL</span>
+            <input class="cky-input" placeholder="YouTube, Vimeo or .mp4 link" [value]="form.mediaUrl" (input)="form.mediaUrl = inputValue($event)" (keydown.enter)="applyMedia()" />
+          </label>
+          <div class="cky-panel-actions">
+            <button type="button" class="cky-action" (click)="closeDialog()">Cancel</button>
+            <button type="button" class="cky-action is-primary" (click)="applyMedia()">Insert</button>
+          </div>
+        }
+        @case ('bookmark') {
+          <label class="cky-field"><span>Bookmark name</span>
+            <input class="cky-input" placeholder="section-1" [value]="form.bookmark" (input)="form.bookmark = inputValue($event)" (keydown.enter)="applyBookmark()" />
+          </label>
+          <div class="cky-panel-actions">
+            <button type="button" class="cky-action" (click)="closeDialog()">Cancel</button>
+            <button type="button" class="cky-action is-primary" (click)="applyBookmark()">Insert</button>
+          </div>
+        }
+      }
+      @if (dialogError) {
+        <div class="cky-panel-error">{{ dialogError }}</div>
+      }
+    </div>
+  }
+
+  <div class="cky-body">
+    <div
+      #editorEl
+      class="cky-content"
+      role="textbox"
+      aria-multiline="true"
+      [attr.aria-label]="placeholder"
+      [attr.contenteditable]="editable"
+      [attr.spellcheck]="spellcheck"
+      [attr.data-placeholder]="placeholder"
+      [class.is-empty]="isEmpty"
+      [class.is-painting]="!!painter"
+      [hidden]="mode === 'source'"
+      [style.min-height.px]="minHeight"
+      (input)="onInput()"
+      (blur)="onBlur()"
+      (keydown)="onKeydown($event)"
+      (paste)="onPaste($event)"
+      (mouseup)="onMouseUp()"
+      (mousedown)="openMenu = null"
+      (click)="onEditorClick($event)"
+    ></div>
+    @if (mode === 'source') {
+      <textarea
+        class="cky-source"
+        spellcheck="false"
+        aria-label="HTML source"
+        [style.min-height.px]="minHeight"
+        [value]="sourceHtml"
+        (input)="sourceHtml = inputValue($event); onSourceInput()"
+      ></textarea>
+    }
+  </div>
+
+  <div class="cky-statusbar">
+    <span class="cky-notice">{{ notice || (mode === 'source' ? 'Editing HTML source' : mode === 'preview' ? 'Preview mode' : '') }}</span>
+    <span class="cky-counts">Words: {{ wordCount }} &nbsp;·&nbsp; Characters: {{ charCount }}</span>
+  </div>
+</div>

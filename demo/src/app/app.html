@@ -1,0 +1,19 @@
+<main class="page">
+  <header class="page-header">
+    <h1>CKY Editor</h1>
+    <p>Rich text editing for Angular 21 — no icon fonts, no extra dependencies.</p>
+  </header>
+
+  <cky-editor [(ngModel)]="content" documentTitle="cky-demo" [minHeight]="320" />
+
+  <section class="panels">
+    <div class="panel">
+      <h2>HTML output</h2>
+      <pre>{{ content }}</pre>
+    </div>
+    <div class="panel">
+      <h2>Rendered</h2>
+      <div class="cky-content" [innerHTML]="content"></div>
+    </div>
+  </section>
+</main>

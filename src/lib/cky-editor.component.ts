@@ -1,1120 +1,978 @@
-import { Component, ElementRef, forwardRef, ViewChild, OnInit, AfterViewInit, Renderer2 } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  HostListener,
+  Input,
+  OnDestroy,
+  ViewChild,
+  Injector,
+  ViewEncapsulation,
+  afterNextRender,
+  forwardRef,
+  inject,
+} from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import {
+  BULLET_STYLES,
+  COLORS,
+  EMOJIS,
+  FONT_FAMILIES,
+  FONT_SIZES,
+  HEADINGS,
+  LAYOUTS,
+  LINE_HEIGHTS,
+  NUMBER_STYLES,
+  SPECIAL_CHARS,
+  STYLES,
+  StyleOption,
+  TABLE_GRID_SIZE,
+  TEMPLATES,
+} from './editor-config';
+import {
+  buildPrintDocument,
+  buildWordDocument,
+  cleanPastedHtml,
+  countWords,
+  downloadFile,
+  escapeHtml,
+  readFileAsDataUrl,
+  sanitizeHtml,
+  toEmbedHtml,
+  toTitleCase,
+} from './html-utils';
+import { ICONS, IconName } from './icons';
+import { TableAction, applyTableAction, buildTableHtml, closestCell, moveToAdjacentCell } from './table-utils';
+
+type Mode = 'wysiwyg' | 'source' | 'preview';
+type DialogKind = 'link' | 'find' | 'imageUrl' | 'media' | 'bookmark';
+type MenuId =
+  | 'textCase' | 'image' | 'table' | 'emoji' | 'special' | 'heading' | 'style' | 'fontSize'
+  | 'fontFamily' | 'fontColor' | 'highlight' | 'align' | 'lineHeight' | 'layout' | 'template' | 'bullet' | 'number';
+
+interface PainterFormat {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strike: boolean;
+  color: string;
+  background: string | null;
+  fontSize: string;
+  fontFamily: string;
+}
+
+const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,blockquote,pre,li';
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const HISTORY_LIMIT = 100;
 
 @Component({
-  selector: 'lib-cky-editor',
-  standalone: false,
-  template: `
-   <!-- rich-editor.component.html -->
-<div class="rich-editor-container">
-    <div class="toolbar">
-      <!-- Text formatting -->
-      <select (change)="formatText('formatBlock', $event)">
-        <option value="p">Normal</option>
-        <option value="h1">Heading 1</option>
-        <option value="h2">Heading 2</option>
-        <option value="h3">Heading 3</option>
-        <option value="h4">Heading 4</option>
-        <option value="h5">Heading 5</option>
-        <option value="h6">Heading 6</option>
-        <option value="pre">Code</option>
-      </select>
-      <select [value]="fontFamily" (change)="changeFontFamily($event)">
-        <option value="Arial, sans-serif">Sans Serif</option>
-        <option value="Times New Roman, serif">Serif</option>
-        <option value="Courier New, monospace">Monospace</option>
-        <option value="Arial">Arial</option>
-        <option value="Helvetica">Helvetica</option>
-        <option value="Times New Roman">Times New Roman</option>
-        <option value="Courier">Courier</option>
-      </select>
-  
-      <!-- Text style -->
-      <button (click)="applyFormat('bold')" title="Bold">
-        <i class="fas fa-bold"></i>
-      </button>
-      <button (click)="applyFormat('italic')" title="Italic">
-        <i class="fas fa-italic"></i>
-      </button>
-      <button (click)="applyFormat('underline')" title="Underline">
-        <i class="fas fa-underline"></i>
-      </button>
-      <button (click)="applyFormat('strikeThrough')" title="Strike Through">
-        <i class="fas fa-strikethrough"></i>
-      </button>
-  
-      <!-- Text color -->
-      <div class="color-picker">
-        <input type="color" [(ngModel)]="textColor" (change)="setTextColor($event)" title="Text Color">
-        <span class="color-indicator">A</span>
-      </div>
-      <div class="color-picker">
-        <input type="color" [(ngModel)]="backgroundColor" (change)="setBackgroundColor($event)" title="Background Color">
-        <span class="color-indicator">BG</span>
-      </div>
-  
-      <!-- Alignment -->
-      <button (click)="setAlignment('left')" title="Align Left">
-        <i class="fas fa-align-left"></i>
-      </button>
-      <button (click)="setAlignment('center')" title="Align Center">
-        <i class="fas fa-align-center"></i>
-      </button>
-      <button (click)="setAlignment('right')" title="Align Right">
-        <i class="fas fa-align-right"></i>
-      </button>
-      <button (click)="setAlignment('justify')" title="Justify">
-        <i class="fas fa-align-justify"></i>
-      </button>
-  
-      <!-- Lists -->
-      <button (click)="formatText('insertOrderedList')" title="Numbered List">
-        <i class="fas fa-list-ol"></i>
-      </button>
-      <button (click)="formatText('insertUnorderedList')" title="Bullet List">
-        <i class="fas fa-list-ul"></i>
-      </button>
-  
-      <!-- Indent/Outdent -->
-      <button (click)="formatText('indent')" title="Increase Indent">
-        <i class="fas fa-indent"></i>
-      </button>
-      <button (click)="formatText('outdent')" title="Decrease Indent">
-        <i class="fas fa-outdent"></i>
-      </button>
-  
-      <!-- Insert elements -->
-      <button (click)="insertLink()" title="Insert Link">
-        <i class="fas fa-link"></i>
-      </button>
-      <button (click)="insertImage()" title="Insert Image">
-        <i class="fas fa-image"></i>
-      </button>
-      <button (click)="insertTable()" title="Insert Table">
-        <i class="fas fa-table"></i>
-      </button>
-      
-  
-      <!-- Source code view -->
-      <button (click)="toggleSourceView()" title="Source Code">
-        <i class="fas fa-code"></i>
-      </button>
-
-      <div class="toolbar-separator"></div>
-
-      <!-- New Features: Undo/Redo -->
-      <button (click)="undo()" title="Undo (Ctrl+Z)" [disabled]="!canUndo">
-        <i class="fas fa-undo"></i>
-      </button>
-      <button (click)="redo()" title="Redo (Ctrl+Y)" [disabled]="!canRedo">
-        <i class="fas fa-redo"></i>
-      </button>
-
-      <div class="toolbar-separator"></div>
-
-      <!-- New Features: Export & Print -->
-      <button (click)="exportToWord()" title="Export to Word">
-        <i class="fas fa-file-word"></i>
-      </button>
-      <button (click)="exportToPDF()" title="Export to PDF">
-        <i class="fas fa-file-pdf"></i>
-      </button>
-      <button (click)="printContent()" title="Print">
-        <i class="fas fa-print"></i>
-      </button>
-
-      <div class="toolbar-separator"></div>
-
-      <!-- Word/Character Count -->
-      <div class="word-count-display">
-        <span class="count-text">Words: {{ wordCount }}</span>
-        <span class="count-text">Chars: {{ characterCount }}</span>
-      </div>
-    </div>
-  
-    <!-- Hidden file inputs -->
-    <input
-      #imageInput
-      type="file"
-      accept="image/*"
-      style="display: none"
-      (change)="onImageSelected($event)"
-    >
-    
-    <!-- Editable content area -->
-    <div
-      #editableContent
-      class="editor-content"
-      [class.source-view]="isSourceView"
-      (input)="onContentChange()"
-      (keydown)="onKeyDown($event)"
-    ></div>
-  </div>
-  `,
-  styles: [
-    
-    `
-    .rich-editor-container {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fafafa;
-    font-family: Arial, sans-serif;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    overflow: hidden;
-  }
-  
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    padding: 6px 8px;
-    background: #f0f0f0;
-    border-bottom: 1px solid #ccc;
-    gap: 6px;
-  }
-  
-  .toolbar select {
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background: #fff;
-    padding: 4px 6px;
-    font-size: 14px;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  
-  .toolbar button {
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 4px 6px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #333;
-    transition: background 0.2s, border-color 0.2s;
-  }
-  
-  .toolbar button:hover {
-    background: #e8e8e8;
-    border-color: #bbb;
-  }
-  
-  .toolbar i {
-    font-size: 14px;
-  }
-
-  .toolbar-separator {
-    width: 1px;
-    height: 20px;
-    background: #ccc;
-    margin: 0 4px;
-  }
-
-  .word-count-display {
-    display: flex;
-    gap: 12px;
-    margin-left: 8px;
-    padding: 4px 8px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    font-size: 12px;
-    color: #666;
-  }
-
-  .count-text {
-    white-space: nowrap;
-  }
-
-  .toolbar button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .toolbar button:disabled:hover {
-    background: #fff;
-    border-color: #ccc;
-  }
-  
-  .color-picker {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    position: relative;
-  }
-  
-  .color-picker input[type="color"] {
-    border: none;
-    padding: 0;
-    width: 22px;
-    height: 22px;
-    cursor: pointer;
-    background: transparent;
-  }
-  
-  .color-picker .color-indicator {
-    font-size: 12px;
-    font-weight: bold;
-    padding: 2px 4px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    line-height: 1;
-  }
-  
-  .editor-content {
-    background: #fff;
-    min-height: 250px;
-    padding: 10px;
-    font-size: 14px;
-    line-height: 1.5;
-    color: #333;
-    overflow-y: auto;
-  }
-  
-  .editor-content:focus {
-    outline: none;
-  }
-  
-  .editor-content.source-view {
-    font-family: Consolas, Monaco, 'Courier New', monospace;
-    white-space: pre;
-    overflow-wrap: normal;
-  }
-  
-  /* Optional scrollbar styling for a cleaner look */
-  .editor-content::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .editor-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
-  }
-  
-  .editor-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
-  }
-  
-  .editor-content::-webkit-scrollbar-thumb:hover {
-    background: #b3b3b3;
-  }
-  
-  /* Add a subtle hover effect to toolbar elements */
-  .toolbar button:focus,
-  .toolbar select:focus,
-  .color-picker input[type="color"]:focus {
-    outline: 2px solid #aaa;
-  }
-  
-  /* Responsive adjustments */
-  @media (max-width: 600px) {
-    .toolbar {
-      justify-content: flex-start;
-      flex-wrap: wrap;
-    }
-    .toolbar button,
-    .toolbar select {
-      margin-bottom: 4px;
-    }
-  }
-  
-  
-  .table-button-container {
-    position: relative;
-    display: inline-block;
-  }
-  
-  .table-button-container .tooltip-text {
-    visibility: hidden;
-    width: 200px;
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    border-radius: 6px;
-    padding: 5px;
-    position: absolute;
-    z-index: 1;
-    bottom: 125%;
-    left: 50%;
-    transform: translateX(-50%);
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  
-  .table-button-container:hover .tooltip-text {
-    visibility: visible;
-    opacity: 1;
-  }
-  
-  .table-button-container .tooltip-text::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    margin-left: -5px;
-    border-width: 5px;
-    border-style: solid;
-    border-color: #333 transparent transparent transparent;
-  }
-  /* In your component's CSS file or global styles */
-  .editor-content table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 10px;
-  }
-  
-  .editor-content table, 
-  .editor-content td, 
-  .editor-content th {
-    border: 1px solid #000;
-    padding: 8px;
-  }
-  
-  .editor-content td {
-    min-width: 50px;
-    text-align: left;
-    vertical-align: top;
-  }
-    `
-  ],
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => CkyEditorComponent),
-      multi: true
-    }
-  ]
+  selector: 'cky-editor',
+  standalone: true,
+  templateUrl: './cky-editor.component.html',
+  styleUrl: './cky-editor.component.css',
+  encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => CkyEditorComponent), multi: true }],
 })
-export class CkyEditorComponent {
+export class CkyEditorComponent implements ControlValueAccessor, AfterViewInit, OnDestroy {
+  @Input() placeholder = 'Type or paste your content here…';
+  @Input() minHeight = 260;
+  @Input() documentTitle = 'document';
 
-@ViewChild('editableContent', { static: true }) editableContent!: ElementRef<HTMLDivElement>;
-  @ViewChild('imageInput') imageInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('linkInput') linkInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('editorEl', { static: true }) private editableRef!: ElementRef<HTMLDivElement>;
 
-  content: string = '';
-  textColor: string = '#000000';
-  backgroundColor: string = '#ffffff';
-  fontSize: string = '3';
-  fontFamily: string = 'Arial, sans-serif';
-  textAlign: string = 'left';
-  isSourceView: boolean = false;
-  selection: Range | null = null;
-  currentTable: HTMLTableElement | null = null;
-  onChange: any = () => {};
-  onTouch: any = () => {};
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly injector = inject(Injector);
+  private readonly sanitizer = inject(DomSanitizer);
 
-  // New Features: Undo/Redo
+  // Icons are static in-house SVG constants, never user input.
+  readonly icon = Object.fromEntries(
+    Object.entries(ICONS).map(([name, markup]) => [name, this.sanitizer.bypassSecurityTrustHtml(markup)]),
+  ) as Record<IconName, SafeHtml>;
+
+  readonly headings = HEADINGS;
+  readonly styles = STYLES;
+  readonly fontFamilies = FONT_FAMILIES;
+  readonly fontSizes = FONT_SIZES;
+  readonly lineHeights = LINE_HEIGHTS;
+  readonly colors = COLORS;
+  readonly bulletStyles = BULLET_STYLES;
+  readonly numberStyles = NUMBER_STYLES;
+  readonly layouts = LAYOUTS;
+  readonly templates = TEMPLATES;
+  readonly emojis = EMOJIS;
+  readonly specialChars = SPECIAL_CHARS;
+  readonly gridIndexes = Array.from({ length: TABLE_GRID_SIZE }, (_, i) => i);
+
+  mode: Mode = 'wysiwyg';
+  sourceHtml = '';
+  openMenu: MenuId | null = null;
+  dialog: DialogKind | null = null;
+  dialogError = '';
+  findStatus = '';
+  notice = '';
+  form = {
+    linkUrl: '', linkText: '', linkNewTab: true,
+    find: '', replace: '', matchCase: false,
+    imageUrl: '', imageAlt: '', mediaUrl: '', bookmark: '',
+  };
+  tableHover = { rows: 0, cols: 0 };
+  state = {
+    bold: false, italic: false, underline: false, strike: false, superscript: false, subscript: false,
+    ul: false, ol: false, blockquote: false, link: false, inTable: false, block: 'p', align: 'left',
+    font: 'Default',
+  };
+  painter: PainterFormat | null = null;
+  fullscreen = false;
+  spellcheck = true;
+  disabled = false;
+  isEmpty = true;
+  wordCount = 0;
+  charCount = 0;
+
+  private html = '';
+  private viewReady = false;
+  private savedRange: Range | null = null;
+  private matchIndex = -1;
   private history: string[] = [];
-  private historyIndex: number = -1;
-  private maxHistorySize: number = 50;
-  canUndo: boolean = false;
-  canRedo: boolean = false;
+  private historyIndex = 0;
+  private historyTimer?: ReturnType<typeof setTimeout>;
+  private noticeTimer?: ReturnType<typeof setTimeout>;
+  private onChange: (value: string) => void = () => {};
+  private onTouched: () => void = () => {};
 
-  // Word/Character Count
-  wordCount: number = 0;
-  characterCount: number = 0;
+  get canUndo(): boolean {
+    return this.historyIndex > 0 || this.historyTimer !== undefined;
+  }
 
-  constructor(private renderer: Renderer2) {}
+  get canRedo(): boolean {
+    return this.historyIndex < this.history.length - 1;
+  }
 
-  ngOnInit(): void {
-    this.setupAdvancedPasteHandler();
-    this.setupSelectionSaver();
-    this.setupTableContextMenu();
-    this.setupUndoRedo();
+  get headingLabel(): string {
+    return this.headings.find((h) => h.value === this.state.block)?.label ?? 'Paragraph';
+  }
+
+  get editable(): boolean {
+    return this.mode === 'wysiwyg' && !this.disabled;
+  }
+
+  private get editor(): HTMLDivElement {
+    return this.editableRef.nativeElement;
+  }
+
+  ngAfterViewInit(): void {
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+    this.editor.innerHTML = this.html;
+    this.viewReady = true;
+    this.resetHistory();
     this.updateCounts();
   }
 
-  ngAfterViewInit() {
-    this.makeContentEditable();
-    this.editableContent.nativeElement.addEventListener('blur', () => {
-      this.onTouch();
-    });
+  ngOnDestroy(): void {
+    clearTimeout(this.historyTimer);
+    clearTimeout(this.noticeTimer);
+    if (this.fullscreen) document.body.style.overflow = '';
   }
 
-  private setupSelectionSaver() {
-    document.addEventListener('mouseup', () => {
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        this.selection = selection.getRangeAt(0).cloneRange();
-      }
-    });
-  }
+  // ControlValueAccessor
 
-  makeContentEditable() {
-    this.renderer.setAttribute(this.editableContent.nativeElement, 'contenteditable', 'true');
-    this.renderer.setStyle(this.editableContent.nativeElement, 'min-height', '200px');
-  }
-
-  // Setup Undo/Redo functionality
-  private setupUndoRedo(): void {
-    if (this.editableContent) {
-      // Save initial state
-      this.saveToHistory();
-
-      // Listen for keyboard shortcuts
-      this.editableContent.nativeElement.addEventListener('keydown', (e: KeyboardEvent) => {
-        // Ctrl+Z for undo
-        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-          e.preventDefault();
-          this.undo();
-        }
-        // Ctrl+Y or Ctrl+Shift+Z for redo
-        if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
-          e.preventDefault();
-          this.redo();
-        }
-      });
-
-      // Save to history on input (with debounce)
-      let timeout: any;
-      this.editableContent.nativeElement.addEventListener('input', () => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          this.saveToHistory();
-        }, 300);
-      });
-    }
-  }
-
-  private saveToHistory(): void {
-    if (!this.editableContent) return;
-    
-    const currentContent = this.editableContent.nativeElement.innerHTML;
-    
-    // Don't save if content hasn't changed
-    if (this.history[this.historyIndex] === currentContent) {
-      return;
-    }
-
-    // Remove future history if we're in the middle
-    if (this.historyIndex < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIndex + 1);
-    }
-
-    // Add to history
-    this.history.push(currentContent);
-    this.historyIndex++;
-
-    // Limit history size
-    if (this.history.length > this.maxHistorySize) {
-      this.history.shift();
-      this.historyIndex--;
-    }
-
-    this.updateUndoRedoState();
-  }
-
-  undo(): void {
-    if (!this.canUndo || !this.editableContent) return;
-
-    this.historyIndex--;
-    this.content = this.history[this.historyIndex];
-    this.editableContent.nativeElement.innerHTML = this.content;
-    this.onChange(this.content);
-    this.updateUndoRedoState();
+  writeValue(value: string | null): void {
+    const next = value ?? '';
+    if (next === this.html) return;
+    this.html = next;
+    if (!this.viewReady) return;
+    this.editor.innerHTML = next;
+    this.resetHistory();
     this.updateCounts();
   }
 
-  redo(): void {
-    if (!this.canRedo || !this.editableContent) return;
-
-    this.historyIndex++;
-    this.content = this.history[this.historyIndex];
-    this.editableContent.nativeElement.innerHTML = this.content;
-    this.onChange(this.content);
-    this.updateUndoRedoState();
-    this.updateCounts();
-  }
-
-  private updateUndoRedoState(): void {
-    this.canUndo = this.historyIndex > 0;
-    this.canRedo = this.historyIndex < this.history.length - 1;
-  }
-
-  // Advanced Paste Handler
-  private setupAdvancedPasteHandler(): void {
-    if (this.editableContent) {
-      this.editableContent.nativeElement.addEventListener('paste', (e: ClipboardEvent) => {
-        e.preventDefault();
-        const clipboardData = e.clipboardData;
-        
-        // Check for images first
-        if (clipboardData?.items) {
-          for (let i = 0; i < clipboardData.items.length; i++) {
-            const item = clipboardData.items[i];
-            if (item.type.indexOf('image') !== -1) {
-              const file = item.getAsFile();
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const img = `<img src="${event.target?.result}" style="max-width: 100%;">`;
-                  this.insertPastedContent(img);
-                };
-                reader.readAsDataURL(file);
-                return;
-              }
-            }
-          }
-        }
-        
-        // Fallback to text content with HTML preservation
-        let pasteContent = clipboardData?.getData('text/html') || 
-                           clipboardData?.getData('text/plain') || '';
-        
-        // Sanitize and clean the pasted content
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = pasteContent;
-        
-        // Remove potentially harmful scripts or styles
-        const scripts = tempDiv.getElementsByTagName('script');
-        while (scripts.length > 0) {
-          scripts[0].remove();
-        }
-        
-        this.insertPastedContent(tempDiv.innerHTML);
-      });
-    }
-  }
-
-  // Improved content insertion method
-  private insertPastedContent(content: string) {
-    // Restore selection if exists
-    if (this.selection) {
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(this.selection);
-      }
-    }
-
-    // Insert content using execCommand or modern insertion methods
-    if (document.queryCommandSupported('insertHTML')) {
-      document.execCommand('insertHTML', false, content);
-    } else {
-      const selection = window.getSelection();
-      if (selection) {
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
-        const fragment = range.createContextualFragment(content);
-        range.insertNode(fragment);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    }
-
-    this.onContentChange();
-  }
-
-  // Comprehensive formatting method
-  formatText(command: string, event?: any): void {
-    // Ensure the editable area has focus
-    this.editableContent.nativeElement.focus();
-    let value = event;
-    if (event?.target) {
-      value = event.target.value;
-    }
-    if (command === 'formatBlock') {
-      value = `<${value}>`; // Wrap the tag in <>
-    }
- 
-   
-    // Restore selection if it exists
-    if (this.selection) {
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(this.selection);
-      }
-    }
-
-    // Special handling for lists to ensure proper formatting
-    if (command === 'insertUnorderedList' || command === 'insertOrderedList') {
-      // Use document.execCommand for list insertion
-      document.execCommand(command, false);
-
-      // Additional list formatting
-      const container = this.editableContent.nativeElement;
-      const lists = container.querySelectorAll('ul, ol');
-      
-      lists.forEach(list => {
-        const listElement = list as HTMLUListElement | HTMLOListElement;
-        
-        // Ensure consistent styling
-        listElement.style.paddingLeft = '30px';
-        
-        // Set list style
-        if (list.tagName === 'UL') {
-          listElement.style.listStyleType = 'disc';
-        } else {
-          listElement.style.listStyleType = 'decimal';
-        }
-
-        // Ensure list items have proper margins
-        const listItems = listElement.querySelectorAll('li');
-        listItems.forEach(item => {
-          (item as HTMLLIElement).style.marginBottom = '5px';
-        });
-      });
-    } else if (command === 'formatBlock' && value) {
-      // Block formatting
-      document.execCommand(command, false, value);
-    } else if (value) {
-      // Other commands with values
-      document.execCommand(command, false, value);
-    } else {
-      // Commands without values
-      document.execCommand(command, false);
-    }
-
-    this.onContentChange();
-  }
-
-  // ControlValueAccessor methods
-  writeValue(value: string): void {
-    this.content = value || '';
-    if (this.editableContent) {
-      this.editableContent.nativeElement.innerHTML = this.content;
-      // Reset history when value is set from outside
-      this.history = [this.content];
-      this.historyIndex = 0;
-      this.updateUndoRedoState();
-      this.updateCounts();
-    }
-  }
-
-  registerOnChange(fn: any): void {
+  registerOnChange(fn: (value: string) => void): void {
     this.onChange = fn;
   }
 
-  registerOnTouched(fn: any): void {
-    this.onTouch = fn;
+  registerOnTouched(fn: () => void): void {
+    this.onTouched = fn;
   }
 
-  // Existing methods (setTextColor, setBackgroundColor, etc.)
-  setTextColor(event: Event): void {
-    const color = (event.target as HTMLInputElement).value;
-    this.textColor = color;
-    this.restoreSelectionAndExecuteCommand('foreColor', color);
+  setDisabledState(disabled: boolean): void {
+    this.disabled = disabled;
+    this.cdr.markForCheck();
   }
 
-  setBackgroundColor(event: Event): void {
-    const color = (event.target as HTMLInputElement).value;
-    this.backgroundColor = color;
-    this.restoreSelectionAndExecuteCommand('hiliteColor', color);
+  // Editor events
+
+  onInput(): void {
+    this.emitChange();
   }
 
-  private restoreSelectionAndExecuteCommand(command: string, value: string) {
-    // Restore selection before applying color
-    if (this.selection) {
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(this.selection);
-      }
+  onBlur(): void {
+    this.onTouched();
+  }
+
+  onMouseUp(): void {
+    if (this.painter) this.applyPainter();
+  }
+
+  onEditorClick(event: MouseEvent): void {
+    const item = (event.target as HTMLElement).closest('ul.cky-todo > li') as HTMLLIElement | null;
+    if (!item || event.clientX - item.getBoundingClientRect().left > 24) return;
+    item.classList.toggle('cky-checked');
+    this.emitChange();
+  }
+
+  onPaste(event: ClipboardEvent): void {
+    const data = event.clipboardData;
+    if (!data) return;
+    event.preventDefault();
+
+    const image = Array.from(data.files).find((f) => f.type.startsWith('image/'));
+    if (image) {
+      this.insertImageFile(image);
+      return;
     }
+    const html = data.getData('text/html');
+    if (html) this.insertHtml(cleanPastedHtml(html));
+    else this.insertText(data.getData('text/plain'));
+  }
+
+  onKeydown(event: KeyboardEvent): void {
+    const mod = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+
+    if (mod && key === 'z' && !event.shiftKey) return this.handled(event, () => this.undo());
+    if (mod && (key === 'y' || (key === 'z' && event.shiftKey))) return this.handled(event, () => this.redo());
+    if (mod && key === 'k') return this.handled(event, () => this.openDialog('link'));
+    if (mod && key === 'f') return this.handled(event, () => this.openDialog('find'));
+    if (key === 'escape' && this.fullscreen) return this.handled(event, () => this.toggleFullscreen());
+
+    if (key === 'tab') {
+      const cell = closestCell(this.selectionNode(), this.editor);
+      if (cell) {
+        return this.handled(event, () => {
+          const target = moveToAdjacentCell(cell, event.shiftKey);
+          if (target) this.placeCaret(target, true);
+          this.emitChange();
+        });
+      }
+      if (this.currentList()) return this.handled(event, () => this.exec(event.shiftKey ? 'outdent' : 'indent'));
+    }
+  }
+
+  @HostListener('document:selectionchange')
+  onSelectionChange(): void {
+    const selection = document.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!this.editor.contains(range.commonAncestorContainer)) return;
+    this.savedRange = range.cloneRange();
+    this.refreshState();
+  }
+
+  @HostListener('document:mousedown', ['$event'])
+  onDocumentMouseDown(event: MouseEvent): void {
+    if (this.openMenu && !(event.target as HTMLElement).closest('.cky-dropdown')) this.openMenu = null;
+    if (!this.host.nativeElement.contains(event.target as Node)) this.dialog = null;
+  }
+
+  // Keeps the editor selection alive while toolbar buttons are clicked.
+  keepSelection(event: MouseEvent): void {
+    this.flushSnapshot();
+    const target = event.target as HTMLElement;
+    if (!target.closest('input, select, textarea')) event.preventDefault();
+  }
+
+  toggleMenu(menu: MenuId): void {
+    this.openMenu = this.openMenu === menu ? null : menu;
+    this.tableHover = { rows: 0, cols: 0 };
+  }
+
+  // History
+
+  undo(): void {
+    this.flushSnapshot();
+    if (this.historyIndex > 0) this.restoreSnapshot(this.history[--this.historyIndex]);
+  }
+
+  redo(): void {
+    if (this.canRedo) this.restoreSnapshot(this.history[++this.historyIndex]);
+  }
+
+  private resetHistory(): void {
+    clearTimeout(this.historyTimer);
+    this.historyTimer = undefined;
+    this.history = [this.editor.innerHTML];
+    this.historyIndex = 0;
+  }
+
+  private scheduleSnapshot(): void {
+    clearTimeout(this.historyTimer);
+    this.historyTimer = setTimeout(() => this.flushSnapshot(), 300);
+  }
+
+  private flushSnapshot(): void {
+    if (this.historyTimer !== undefined) this.commitSnapshot();
+  }
+
+  private commitSnapshot(): void {
+    clearTimeout(this.historyTimer);
+    this.historyTimer = undefined;
+    const current = this.editor.innerHTML;
+    if (this.history[this.historyIndex] === current) return;
+    this.history = [...this.history.slice(0, this.historyIndex + 1), current].slice(-HISTORY_LIMIT);
+    this.historyIndex = this.history.length - 1;
+    this.cdr.markForCheck();
+  }
+
+  private restoreSnapshot(html: string): void {
+    this.editor.innerHTML = html;
+    this.placeCaret(this.editor, false);
+    this.publish();
+  }
+
+  // Formatting commands
+
+  exec(command: string, value?: string): void {
+    this.restoreSelection();
     document.execCommand(command, false, value);
-    this.onContentChange();
+    this.afterEdit();
   }
 
-  // Content change tracking
-  onContentChange(): void {
-    if (this.editableContent) {
-      const value = this.editableContent.nativeElement.innerHTML;
-      
-      // Preserve background colors and other styles
-      this.content = value;
-      this.onChange(value);
-  
-      // Save current selection
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        this.selection = selection.getRangeAt(0).cloneRange();
-      }
-
-      // Update word and character counts
-      this.updateCounts();
-    }
+  setHeading(tag: string): void {
+    this.exec('formatBlock', `<${tag}>`);
   }
 
-  // Update word and character counts
-  private updateCounts(): void {
-    if (!this.editableContent) return;
-
-    const text = this.editableContent.nativeElement.innerText || '';
-    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-    this.wordCount = text.trim() === '' ? 0 : words.length;
-    this.characterCount = text.length;
-  }
-  // Other existing methods
-  onKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Tab') {
-      event.preventDefault();
-      document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
-    }
+  toggleBlockquote(): void {
+    this.exec('formatBlock', this.state.blockquote ? '<p>' : '<blockquote>');
   }
 
-  // Image and other existing methods remain the same as in previous implementations
-  insertImage(): void {
-    this.imageInput.nativeElement.click();
+  setAlign(align: 'left' | 'center' | 'right' | 'justify'): void {
+    this.exec(`justify${align === 'justify' ? 'Full' : align[0].toUpperCase() + align.slice(1)}`);
   }
 
-  onImageSelected(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = `<img src="${e.target?.result}" style="max-width: 100%;">`;
-        this.insertPastedContent(img);
-      };
-      reader.readAsDataURL(file);
-    }
+  setColor(kind: 'fore' | 'back', color: string): void {
+    this.restoreSelection();
+    document.execCommand('styleWithCSS', false, 'true');
+    document.execCommand(kind === 'fore' ? 'foreColor' : 'hiliteColor', false, color);
+    document.execCommand('styleWithCSS', false, 'false');
+    this.afterEdit();
   }
 
-  setAlignment(alignment: string): void {
-    this.formatText('justifyLeft');
-    if (alignment !== 'left') {
-      this.formatText(`justify${alignment.charAt(0).toUpperCase() + alignment.slice(1)}`);
-    }
-  }
-  // Link handling
-  insertLink(): void {
-    const url = prompt('Enter URL:');
-    if (url) {
-      this.formatText('createLink', url);
-    }
+  setFontSize(size: string): void {
+    this.restoreSelection();
+    this.applyInlineStyle('fontSize', size);
+    this.afterEdit();
   }
 
- // Advanced Table Editing Methods
- private setupTableContextMenu() {
-  this.editableContent.nativeElement.addEventListener('contextmenu', (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const tableCell = target.closest('td');
-    
-    if (tableCell) {
-      e.preventDefault();
-      this.currentTable = tableCell.closest('table') as HTMLTableElement;
-      this.showTableContextMenu(e, tableCell);
-    }
-  });
-}
-
-private showTableContextMenu(e: MouseEvent, cell: HTMLTableCellElement) {
-  // Remove existing context menu if any
-  const existingMenu = document.getElementById('table-context-menu');
-  if (existingMenu) {
-    existingMenu.remove();
+  setFontFamily(family: string): void {
+    this.restoreSelection();
+    this.applyInlineStyle('fontFamily', family);
+    this.afterEdit();
   }
 
-  // Create context menu
-  const menu = document.createElement('div');
-  menu.id = 'table-context-menu';
-  menu.style.position = 'fixed';
-  menu.style.left = `${e.clientX}px`;
-  menu.style.top = `${e.clientY}px`;
-  menu.style.backgroundColor = 'white';
-  menu.style.border = '1px solid #ccc';
-  menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-  menu.style.zIndex = '1000';
-  menu.style.padding = '10px';
-
-  // Add menu options
-  const options = [
-    { text: 'Add Row Above', action: () => this.addTableRow(cell, 'above') },
-    { text: 'Add Row Below', action: () => this.addTableRow(cell, 'below') },
-    { text: 'Delete Row', action: () => this.deleteTableRow(cell) },
-    { text: 'Add Column Left', action: () => this.addTableColumn(cell, 'left') },
-    { text: 'Add Column Right', action: () => this.addTableColumn(cell, 'right') },
-    { text: 'Delete Column', action: () => this.deleteTableColumn(cell) },
-    { text: 'Delete Table', action: () => this.deleteTable() }
-  ];
-
-  options.forEach(option => {
-    const menuItem = document.createElement('div');
-    menuItem.textContent = option.text;
-    menuItem.style.padding = '5px';
-    menuItem.style.cursor = 'pointer';
-    menuItem.addEventListener('click', () => {
-      option.action();
-      menu.remove();
-    });
-    menuItem.addEventListener('mouseover', () => {
-      menuItem.style.backgroundColor = '#f0f0f0';
-    });
-    menuItem.addEventListener('mouseout', () => {
-      menuItem.style.backgroundColor = 'white';
-    });
-    menu.appendChild(menuItem);
-  });
-
-  // Close menu when clicking outside
-  const closeMenu = (event: MouseEvent) => {
-    if (menu && !menu.contains(event.target as Node)) {
-      menu.remove();
-      document.removeEventListener('click', closeMenu);
-    }
-  };
-
-  document.body.appendChild(menu);
-  document.addEventListener('click', closeMenu);
-}
-
-private addTableRow(cell: HTMLTableCellElement, position: 'above' | 'below') {
-  if (!this.currentTable) return;
-
-  const row = cell.closest('tr') as HTMLTableRowElement;
-  const newRow = row.cloneNode(true) as HTMLTableRowElement;
-
-  // Clear content of new row
-  Array.from(newRow.cells).forEach(cell => {
-    (cell as HTMLTableCellElement).innerHTML = '&nbsp;';
-  });
-
-  if (position === 'above') {
-    row.parentNode?.insertBefore(newRow, row);
-  } else {
-    row.parentNode?.insertBefore(newRow, row.nextSibling);
+  setLineHeight(value: string): void {
+    this.restoreSelection();
+    this.selectedBlocks().forEach((block) => (block.style.lineHeight = value));
+    this.afterEdit();
   }
 
-  this.onContentChange();
-}
-
-private deleteTableRow(cell: HTMLTableCellElement) {
-  const row = cell.closest('tr') as HTMLTableRowElement;
-  
-  // Prevent deleting the last row
-  if (row.parentNode?.children.length === 1) {
-    alert('Cannot delete the last row.');
-    return;
-  }
-
-  row.remove();
-  this.onContentChange();
-}
-
-private addTableColumn(cell: HTMLTableCellElement, position: 'left' | 'right') {
-  if (!this.currentTable) return;
-
-  const cellIndex = cell.cellIndex;
-  const rows = this.currentTable.rows;
-
-  for (let i = 0; i < rows.length; i++) {
-    const newCell = rows[i].insertCell(position === 'left' ? cellIndex : cellIndex + 1);
-    newCell.innerHTML = '&nbsp;';
-    newCell.style.border = '1px solid #000';
-    newCell.style.padding = '8px';
-    newCell.style.minWidth = '50px';
-  }
-
-  this.onContentChange();
-}
-
-private deleteTableColumn(cell: HTMLTableCellElement) {
-  if (!this.currentTable) return;
-
-  const cellIndex = cell.cellIndex;
-  const rows = this.currentTable.rows;
-
-  // Prevent deleting the last column
-  if (rows[0].cells.length === 1) {
-    alert('Cannot delete the last column.');
-    return;
-  }
-
-  for (let i = 0; i < rows.length; i++) {
-    rows[i].deleteCell(cellIndex);
-  }
-
-  this.onContentChange();
-}
-
-private deleteTable() {
-  if (!this.currentTable) return;
-
-  const confirmDelete = confirm('Are you sure you want to delete this entire table?');
-  if (confirmDelete) {
-    this.currentTable.remove();
-    this.currentTable = null;
-    this.onContentChange();
-  }
-}
-
-// Override insertTable method to add more advanced table creation
-insertTable(): void {
-  const rows = prompt('Enter number of rows:', '3');
-  const cols = prompt('Enter number of columns:', '3');
-  if (rows && cols) {
-    const table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.border = '1px solid #000';
-
-    for (let i = 0; i < parseInt(rows); i++) {
-      const row = table.insertRow();
-      for (let j = 0; j < parseInt(cols); j++) {
-        const cell = row.insertCell();
-        cell.style.border = '1px solid #000';
-        cell.style.padding = '8px';
-        cell.style.minWidth = '50px';
-        cell.innerHTML = '&nbsp;';
-      }
-    }
-
-    // Convert table to string and insert
-    this.insertPastedContent(table.outerHTML);
-  }
-}
- // Font size and family
- changeFontSize(event: Event): void {
-  const size = (event.target as HTMLSelectElement).value;
-  this.formatText('fontSize', size);
-}
-
-changeFontFamily(event: Event): void {
-  const font = (event.target as HTMLSelectElement).value;
-  this.formatText('fontName', font);
-}
- // Text formatting
- applyFormat(format: string): void {
-  this.formatText(format);
-}
-  // Source code view toggle
-  toggleSourceView(): void {
-    this.isSourceView = !this.isSourceView;
-    if (this.isSourceView) {
-      const content = this.editableContent.nativeElement.innerHTML;
-      this.editableContent.nativeElement.textContent = content;
+  applyStyle(style: StyleOption): void {
+    this.restoreSelection();
+    if (style.kind === 'block') {
+      this.selectedBlocks().forEach((block) => block.classList.toggle(style.value));
     } else {
-      const content = this.editableContent.nativeElement.textContent || '';
-      this.editableContent.nativeElement.innerHTML = content;
-      this.onContentChange();
+      const existing = this.closestInEditor(`span.${style.value}`);
+      if (existing) existing.replaceWith(...Array.from(existing.childNodes));
+      else this.wrapSelection(style.value);
     }
+    this.afterEdit();
   }
 
-  // Export to Word Document
-  exportToWord(): void {
-    if (!this.content) {
-      alert('No content to export!');
-      return;
-    }
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Document</title>
-        </head>
-        <body>
-          ${this.content}
-        </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\ufeff', htmlContent], {
-      type: 'application/msword'
+  removeFormat(): void {
+    this.restoreSelection();
+    document.execCommand('removeFormat');
+    this.selectedBlocks().forEach((block) => {
+      block.removeAttribute('style');
+      block.removeAttribute('class');
     });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'document.doc';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    this.afterEdit();
   }
 
-  // Export to PDF (using browser print to PDF)
+  setTextCase(mode: 'upper' | 'lower' | 'title'): void {
+    this.restoreSelection();
+    const text = document.getSelection()?.toString() ?? '';
+    if (!text) return this.flash('Select some text first');
+    const next = mode === 'upper' ? text.toUpperCase() : mode === 'lower' ? text.toLowerCase() : toTitleCase(text);
+    this.insertText(next);
+  }
+
+  // Lists
+
+  toggleList(kind: 'ul' | 'ol'): void {
+    this.exec(kind === 'ul' ? 'insertUnorderedList' : 'insertOrderedList');
+  }
+
+  setListStyle(kind: 'ul' | 'ol', listStyle: string, className?: string): void {
+    this.restoreSelection();
+    const list = this.ensureList(kind);
+    if (list) {
+      list.classList.remove('cky-todo', 'cky-multilevel');
+      list.style.listStyleType = listStyle;
+      if (className) list.classList.add(className);
+    }
+    this.afterEdit();
+  }
+
+  toggleTodoList(): void {
+    this.restoreSelection();
+    const current = this.currentList();
+    if (current?.classList.contains('cky-todo')) {
+      document.execCommand('insertUnorderedList');
+    } else {
+      const list = this.ensureList('ul');
+      if (list) {
+        list.classList.remove('cky-multilevel');
+        list.style.listStyleType = '';
+        list.classList.add('cky-todo');
+      }
+    }
+    this.afterEdit();
+  }
+
+  // Inserts
+
+  insertTable(rows: number, cols: number): void {
+    this.insertHtml(buildTableHtml(rows, cols));
+  }
+
+  tableAction(action: TableAction): void {
+    this.restoreSelection();
+    const cell = closestCell(this.selectionNode(), this.editor);
+    if (!cell) return;
+    const target = applyTableAction(cell, action);
+    if (target) this.placeCaret(target, true);
+    this.afterEdit();
+  }
+
+  insertText(text: string): void {
+    this.restoreSelection();
+    document.execCommand('insertText', false, text);
+    this.afterEdit();
+  }
+
+  insertHtml(html: string): void {
+    this.restoreSelection();
+    document.execCommand('insertHTML', false, html);
+    this.afterEdit();
+  }
+
+  insertCodeBlock(): void {
+    this.restoreSelection();
+    const text = document.getSelection()?.toString() ?? '';
+    this.insertHtml(`<pre class="cky-code"><code>${escapeHtml(text) || '<br>'}</code></pre><p><br></p>`);
+  }
+
+  insertPageBreak(): void {
+    this.insertHtml('<div class="cky-page-break" contenteditable="false"></div><p><br></p>');
+  }
+
+  insertLayout(className: string): void {
+    const columns = className === 'cky-cols-3' ? 3 : 2;
+    this.insertHtml(`<div class="cky-layout ${className}">${'<div class="cky-col"><p><br></p></div>'.repeat(columns)}</div><p><br></p>`);
+  }
+
+  async onImageFile(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) await this.insertImageFile(file);
+  }
+
+  async onAttachFile(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) return this.flash('File is larger than 10 MB');
+    const dataUrl = await readFileAsDataUrl(file);
+    const name = escapeHtml(file.name);
+    this.insertHtml(`<a class="cky-file" href="${dataUrl}" download="${name}">${name}</a>&nbsp;`);
+  }
+
+  async onImportFile(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const text = await file.text();
+    const html = /\.txt$/i.test(file.name)
+      ? text.split(/\r?\n/).map((line) => `<p>${escapeHtml(line) || '<br>'}</p>`).join('')
+      : cleanPastedHtml(new DOMParser().parseFromString(text, 'text/html').body.innerHTML);
+    this.editor.innerHTML = html;
+    this.afterEdit();
+    this.flash(`Imported ${file.name}`);
+  }
+
+  private async insertImageFile(file: File): Promise<void> {
+    const dataUrl = await readFileAsDataUrl(file);
+    this.insertHtml(`<img src="${dataUrl}" alt="${escapeHtml(file.name)}">`);
+  }
+
+  // Dialogs
+
+  openDialog(kind: DialogKind): void {
+    this.flushSnapshot();
+    this.openMenu = null;
+    this.dialogError = '';
+    this.findStatus = '';
+    const selected = document.getSelection()?.toString() ?? '';
+
+    if (kind === 'link') {
+      const anchor = this.closestInEditor('a[href]') as HTMLAnchorElement | null;
+      this.form.linkUrl = anchor?.getAttribute('href') ?? '';
+      this.form.linkText = anchor?.textContent ?? selected;
+      this.form.linkNewTab = anchor ? anchor.target === '_blank' : true;
+    }
+    if (kind === 'find') {
+      if (selected) this.form.find = selected;
+      this.matchIndex = -1;
+    }
+    this.dialog = kind;
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLInputElement>('.cky-panel input')?.select(), {
+      injector: this.injector,
+    });
+  }
+
+  closeDialog(): void {
+    this.dialog = null;
+    this.clearHighlights();
+    this.restoreSelection();
+  }
+
+  inputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  checked(event: Event): boolean {
+    return (event.target as HTMLInputElement).checked;
+  }
+
+  applyLink(): void {
+    const raw = this.form.linkUrl.trim();
+    if (!raw) return;
+    const url = /^(https?:|mailto:|tel:|#|\/)/i.test(raw) ? raw : `https://${raw}`;
+    const target = this.form.linkNewTab ? ' target="_blank" rel="noopener noreferrer"' : '';
+
+    this.restoreSelection();
+    const anchor = this.closestInEditor('a[href]') as HTMLAnchorElement | null;
+    if (anchor) {
+      anchor.href = url;
+      if (this.form.linkText.trim()) anchor.textContent = this.form.linkText.trim();
+      anchor.toggleAttribute('target', this.form.linkNewTab);
+      if (this.form.linkNewTab) anchor.target = '_blank';
+    } else {
+      const text = escapeHtml(this.form.linkText.trim() || document.getSelection()?.toString() || raw);
+      document.execCommand('insertHTML', false, `<a href="${escapeHtml(url)}"${target}>${text}</a>`);
+    }
+    this.dialog = null;
+    this.afterEdit();
+  }
+
+  unlink(): void {
+    this.restoreSelection();
+    const anchor = this.closestInEditor('a[href]');
+    if (anchor) anchor.replaceWith(...Array.from(anchor.childNodes));
+    this.afterEdit();
+  }
+
+  applyImageUrl(): void {
+    const url = this.form.imageUrl.trim();
+    if (!/^(https?:\/\/|data:image\/(?!svg))/i.test(url)) {
+      this.dialogError = 'Enter a valid http(s) image URL';
+      return;
+    }
+    this.dialog = null;
+    this.insertHtml(`<img src="${escapeHtml(url)}" alt="${escapeHtml(this.form.imageAlt)}">`);
+    this.form.imageUrl = this.form.imageAlt = '';
+  }
+
+  applyMedia(): void {
+    const html = toEmbedHtml(this.form.mediaUrl);
+    if (!html) {
+      this.dialogError = 'Use a YouTube or Vimeo link, or a direct .mp4 / .webm URL';
+      return;
+    }
+    this.dialog = null;
+    this.insertHtml(html);
+    this.form.mediaUrl = '';
+  }
+
+  applyBookmark(): void {
+    const id = this.form.bookmark.trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    if (!id) {
+      this.dialogError = 'Use letters, numbers, dashes or underscores';
+      return;
+    }
+    this.dialog = null;
+    this.insertHtml(`<a id="${id}" class="cky-bookmark" title="#${id}">&#8203;</a>`);
+    this.form.bookmark = '';
+  }
+
+  // Find & replace
+
+  onFindInput(event: Event): void {
+    this.form.find = this.inputValue(event);
+    this.matchIndex = -1;
+    this.clearHighlights();
+    this.findStatus = '';
+  }
+
+  findNext(): void {
+    const matches = this.findMatches();
+    if (!matches.length) {
+      this.matchIndex = -1;
+      this.clearHighlights();
+      this.findStatus = this.form.find ? 'No results' : '';
+      return;
+    }
+    this.matchIndex = (this.matchIndex + 1) % matches.length;
+    this.findStatus = `${this.matchIndex + 1} of ${matches.length}`;
+    this.highlight(matches, this.matchIndex);
+  }
+
+  replaceOne(): void {
+    const current = this.findMatches()[this.matchIndex];
+    if (current) {
+      current.deleteContents();
+      current.insertNode(document.createTextNode(this.form.replace));
+      this.editor.normalize();
+      this.matchIndex--;
+      this.emitChange();
+    }
+    this.findNext();
+  }
+
+  private findMatches(): Range[] {
+    const needle = this.normalize(this.form.find);
+    if (!needle) return [];
+    const text = this.normalize(this.editor.textContent ?? '');
+    const ranges: Range[] = [];
+    for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length)) {
+      ranges.push(this.rangeFromOffsets(at, at + needle.length));
+    }
+    return ranges;
+  }
+
+  private highlight(matches: Range[], index: number): void {
+    const current = matches[index];
+    if (typeof Highlight !== 'undefined' && CSS.highlights) {
+      CSS.highlights.set('cky-find', new Highlight(...matches));
+      CSS.highlights.set('cky-find-current', new Highlight(current));
+    } else {
+      this.selectRange(current);
+    }
+    current.startContainer.parentElement?.scrollIntoView({ block: 'nearest' });
+  }
+
+  private clearHighlights(): void {
+    if (typeof Highlight === 'undefined' || !CSS.highlights) return;
+    CSS.highlights.delete('cky-find');
+    CSS.highlights.delete('cky-find-current');
+  }
+
+  replaceAll(): void {
+    if (!this.form.find) return;
+    const pattern = new RegExp(this.form.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), this.form.matchCase ? 'g' : 'gi');
+    let count = 0;
+    const walker = document.createTreeWalker(this.editor, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+      const replaced = node.data.replace(pattern, () => (count++, this.form.replace));
+      if (replaced !== node.data) node.data = replaced;
+    }
+    this.findStatus = `Replaced ${count} occurrence${count === 1 ? '' : 's'}`;
+    if (count) this.afterEdit();
+  }
+
+  private normalize(text: string): string {
+    return this.form.matchCase ? text : text.toLowerCase();
+  }
+
+  private rangeFromOffsets(start: number, end: number): Range {
+    const range = document.createRange();
+    const walker = document.createTreeWalker(this.editor, NodeFilter.SHOW_TEXT);
+    let seen = 0;
+    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+      const next = seen + node.length;
+      if (start >= seen && start <= next) range.setStart(node, start - seen);
+      if (end >= seen && end <= next) {
+        range.setEnd(node, end - seen);
+        break;
+      }
+      seen = next;
+    }
+    return range;
+  }
+
+  // Format painter
+
+  togglePainter(): void {
+    if (this.painter) {
+      this.painter = null;
+      return;
+    }
+    this.restoreSelection();
+    const el = this.selectionElement();
+    if (!el) return;
+    const q = (command: string) => document.queryCommandState(command);
+    this.painter = {
+      bold: q('bold'),
+      italic: q('italic'),
+      underline: q('underline'),
+      strike: q('strikeThrough'),
+      color: getComputedStyle(el).color,
+      background: (el.closest('[style*="background"]') as HTMLElement | null)?.style.backgroundColor || null,
+      fontSize: (el.closest('span[style*="font-size"]') as HTMLElement | null)?.style.fontSize ?? '',
+      fontFamily: (el.closest('span[style*="font-family"]') as HTMLElement | null)?.style.fontFamily ?? '',
+    };
+    this.flash('Select text to apply the copied formatting');
+  }
+
+  private applyPainter(): void {
+    const format = this.painter!;
+    const selection = document.getSelection();
+    if (!selection || selection.isCollapsed) return;
+    this.painter = null;
+
+    document.execCommand('removeFormat');
+    if (format.bold) document.execCommand('bold');
+    if (format.italic) document.execCommand('italic');
+    if (format.underline) document.execCommand('underline');
+    if (format.strike) document.execCommand('strikeThrough');
+    document.execCommand('styleWithCSS', false, 'true');
+    document.execCommand('foreColor', false, format.color);
+    if (format.background) document.execCommand('hiliteColor', false, format.background);
+    document.execCommand('styleWithCSS', false, 'false');
+    if (format.fontSize) this.applyInlineStyle('fontSize', format.fontSize);
+    if (format.fontFamily) this.applyInlineStyle('fontFamily', format.fontFamily);
+    this.afterEdit();
+  }
+
+  // Modes, export, print
+
+  setMode(mode: Mode): void {
+    const next = this.mode === mode ? 'wysiwyg' : mode;
+    if (this.mode === 'source') {
+      this.editor.innerHTML = sanitizeHtml(this.sourceHtml);
+      this.emitChange();
+    }
+    if (next === 'source') this.sourceHtml = this.editor.innerHTML;
+    this.mode = next;
+    this.openMenu = this.dialog = null;
+  }
+
+  onSourceInput(): void {
+    this.html = sanitizeHtml(this.sourceHtml);
+    this.onChange(this.html);
+  }
+
+  selectAll(): void {
+    this.editor.focus();
+    document.execCommand('selectAll');
+  }
+
+  toggleFullscreen(): void {
+    this.fullscreen = !this.fullscreen;
+    document.body.style.overflow = this.fullscreen ? 'hidden' : '';
+  }
+
+  exportToWord(): void {
+    const doc = buildWordDocument(this.editor.innerHTML, this.documentTitle);
+    downloadFile('\ufeff' + doc, `${this.documentTitle}.doc`, 'application/msword');
+  }
+
   exportToPDF(): void {
-    if (!this.content) {
-      alert('No content to export!');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to export PDF');
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Export PDF</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            @media print {
-              body { margin: 0; padding: 15px; }
-            }
-          </style>
-        </head>
-        <body>
-          ${this.content}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    this.printContent();
   }
 
-  // Print content
   printContent(): void {
-    if (!this.content) {
-      alert('No content to print!');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to print');
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Print Document</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            @media print {
-              body { margin: 0; padding: 15px; }
-              @page { margin: 1cm; }
-            }
-          </style>
-        </head>
-        <body>
-          ${this.content}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(frame);
+    const win = frame.contentWindow!;
+    win.document.open();
+    win.document.write(buildPrintDocument(this.editor.innerHTML, this.documentTitle));
+    win.document.close();
+    win.onafterprint = () => frame.remove();
     setTimeout(() => {
-      printWindow.print();
-    }, 250);
+      win.focus();
+      win.print();
+    }, 100);
+  }
+
+  // Internals
+
+  private handled(event: Event, action: () => void): void {
+    event.preventDefault();
+    action();
+  }
+
+  // Toolbar commands are discrete undo steps; typing is debounced in emitChange.
+  private afterEdit(): void {
+    this.openMenu = null;
+    this.publish();
+    this.commitSnapshot();
+    this.refreshState();
+  }
+
+  private emitChange(): void {
+    this.publish();
+    this.scheduleSnapshot();
+  }
+
+  private publish(): void {
+    this.updateCounts();
+    this.html = this.isEmpty ? '' : this.editor.innerHTML;
+    this.onChange(this.html);
+  }
+
+  private updateCounts(): void {
+    const text = this.editor.innerText ?? '';
+    this.wordCount = countWords(text);
+    this.charCount = text.replace(/\n/g, '').length;
+    this.isEmpty = !text.trim() && !this.editor.querySelector('img,iframe,video,table,hr,.cky-page-break');
+    this.cdr.markForCheck();
+  }
+
+  private refreshState(): void {
+    const q = (command: string) => document.queryCommandState(command);
+    const el = this.selectionElement();
+    const block = el?.closest('h1,h2,h3,h4,h5,h6,p,pre');
+    this.state = {
+      bold: q('bold'),
+      italic: q('italic'),
+      underline: q('underline'),
+      strike: q('strikeThrough'),
+      superscript: q('superscript'),
+      subscript: q('subscript'),
+      ul: q('insertUnorderedList'),
+      ol: q('insertOrderedList'),
+      blockquote: !!this.closestInEditor('blockquote'),
+      link: !!this.closestInEditor('a[href]'),
+      inTable: !!closestCell(this.selectionNode(), this.editor),
+      block: block && this.editor.contains(block) ? block.tagName.toLowerCase() : 'p',
+      align: el ? getComputedStyle(el).textAlign.replace('start', 'left') : 'left',
+      font: this.fontLabel(el),
+    };
+    this.cdr.markForCheck();
+  }
+
+  private restoreSelection(): void {
+    this.editor.focus({ preventScroll: true });
+    const selection = document.getSelection();
+    if (!selection) return;
+    if (this.savedRange && this.editor.contains(this.savedRange.commonAncestorContainer)) {
+      selection.removeAllRanges();
+      selection.addRange(this.savedRange);
+    } else if (!selection.rangeCount || !this.editor.contains(selection.anchorNode)) {
+      this.placeCaret(this.editor, false);
+    }
+  }
+
+  private selectRange(range: Range): void {
+    this.editor.focus({ preventScroll: true });
+    const selection = document.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    this.savedRange = range.cloneRange();
+  }
+
+  private placeCaret(node: Node, atStart: boolean): void {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(atStart);
+    this.selectRange(range);
+  }
+
+  private selectionNode(): Node | null {
+    return this.savedRange?.startContainer ?? null;
+  }
+
+  private selectionElement(): HTMLElement | null {
+    const node = this.selectionNode();
+    const el = node instanceof HTMLElement ? node : node?.parentElement ?? null;
+    return el && this.editor.contains(el) ? el : null;
+  }
+
+  private closestInEditor(selector: string): HTMLElement | null {
+    const found = this.selectionElement()?.closest(selector) as HTMLElement | null;
+    return found && this.editor.contains(found) && found !== this.editor ? found : null;
+  }
+
+  private currentList(): HTMLOListElement | HTMLUListElement | null {
+    return this.closestInEditor('ul, ol') as HTMLOListElement | HTMLUListElement | null;
+  }
+
+  private ensureList(kind: 'ul' | 'ol'): HTMLOListElement | HTMLUListElement | null {
+    if (this.currentList()?.tagName.toLowerCase() !== kind) {
+      document.execCommand(kind === 'ul' ? 'insertUnorderedList' : 'insertOrderedList');
+      this.onSelectionChange();
+    }
+    return this.currentList();
+  }
+
+  private selectedBlocks(): HTMLElement[] {
+    const range = this.savedRange;
+    if (!range) return [];
+    const blocks = Array.from(this.editor.querySelectorAll<HTMLElement>(BLOCK_SELECTOR)).filter((b) =>
+      range.intersectsNode(b),
+    );
+    const own = this.closestInEditor(BLOCK_SELECTOR);
+    return blocks.length ? blocks : own ? [own] : [];
+  }
+
+  private wrapSelection(className: string): void {
+    const range = this.savedRange;
+    if (!range || range.collapsed) return this.flash('Select some text first');
+    const span = document.createElement('span');
+    span.className = className;
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    const selected = document.createRange();
+    selected.selectNodeContents(span);
+    this.selectRange(selected);
+  }
+
+  // execCommand only emits legacy <font> tags; mark them, then swap for styled spans.
+  private applyInlineStyle(property: 'fontSize' | 'fontFamily', value: string): void {
+    const [command, marker, selector] =
+      property === 'fontSize'
+        ? ['fontSize', '7', 'font[size="7"]']
+        : ['fontName', 'cky-font', 'font[face="cky-font"]'];
+    document.execCommand(command, false, marker);
+    this.editor.querySelectorAll(selector).forEach((font) => {
+      font.querySelectorAll<HTMLElement>('[style]').forEach((el) => (el.style[property] = ''));
+      if (!value) return font.replaceWith(...Array.from(font.childNodes));
+      const span = document.createElement('span');
+      span.style[property] = value;
+      span.append(...Array.from(font.childNodes));
+      font.replaceWith(span);
+    });
+  }
+
+  private fontLabel(el: HTMLElement | null): string {
+    const primary = (stack: string) => stack.split(',')[0].replace(/["']/g, '').trim().toLowerCase();
+    const current = el ? primary(getComputedStyle(el).fontFamily) : '';
+    return this.fontFamilies.find((f) => f.value && primary(f.value) === current)?.label ?? 'Default';
+  }
+
+  private flash(message: string): void {
+    this.notice = message;
+    clearTimeout(this.noticeTimer);
+    this.noticeTimer = setTimeout(() => {
+      this.notice = '';
+      this.cdr.markForCheck();
+    }, 3000);
+    this.cdr.markForCheck();
   }
 }

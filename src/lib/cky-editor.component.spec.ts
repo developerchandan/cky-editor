@@ -1,5 +1,4 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { CkyEditorComponent } from './cky-editor.component';
 
 describe('CkyEditorComponent', () => {
@@ -7,9 +6,7 @@ describe('CkyEditorComponent', () => {
   let fixture: ComponentFixture<CkyEditorComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      declarations: [CkyEditorComponent]
-    });
+    TestBed.configureTestingModule({ imports: [CkyEditorComponent] });
     fixture = TestBed.createComponent(CkyEditorComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -17,5 +14,11 @@ describe('CkyEditorComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('renders the value written by the form control', () => {
+    component.writeValue('<p>Hello</p>');
+    const content = fixture.nativeElement.querySelector('.cky-content') as HTMLElement;
+    expect(content.innerHTML).toBe('<p>Hello</p>');
   });
 });
